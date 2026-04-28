@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+cdk.out/
+*.log
+.env
+.env.local
+.env.*.local
+cdp_api_key.json
+.DS_Store
+scratch/
+.vitest/
+coverage/
