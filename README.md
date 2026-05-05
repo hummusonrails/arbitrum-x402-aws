@@ -93,6 +93,16 @@ sequenceDiagram
     OL-->>A: 200 + gated JSON + Arbiscan link
 ```
 
+<!-- Featured -->
+<p align="center">
+  <a href="https://x.com/hummusonrails/status/2049363842283544939">
+    <img src=".github/x402-on-arbitrum-meets-aws.jpg" alt="x402 on Arbitrum meets AWS — read the article on X" width="640">
+  </a>
+</p>
+<p align="center">
+  <sub><strong>Featured on X</strong> &middot; <a href="https://x.com/hummusonrails/status/2049363842283544939">The narrative behind this synthesis of x402, Arbitrum, and AWS &rarr;</a></sub>
+</p>
+
 ## Quick Start
 
 ```bash
