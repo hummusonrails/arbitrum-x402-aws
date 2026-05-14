@@ -9,8 +9,8 @@
     "test:watch": "vitest",
     "cdk": "cdk",
     "synth": "cdk synth",
-    "deploy": "cdk deploy",
-    "destroy": "cdk destroy",
+    "deploy": "cdk deploy --require-approval never",
+    "destroy": "cdk destroy --force",
     "print-cdp-env": "ts-node scripts/print-cdp-env.ts"
   },
   "dependencies": {
