@@ -1,0 +1,17 @@
+{
+  "name": "arbitrum-x402-aws",
+  "version": "0.1.0",
+  "private": true,
+  "description": "x402 payments on Arbitrum One: AWS CloudFront+Lambda@Edge merchant paid by an AWS Bedrock AgentCore Python agent",
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=./apps/merchant --filter=./packages/* build",
+    "test": "pnpm -r --filter=./apps/merchant --filter=./packages/* test",
+    "synth": "pnpm --filter @x402-aws/merchant synth",
+    "deploy:merchant": "pnpm --filter @x402-aws/merchant deploy",
+    "destroy:merchant": "pnpm --filter @x402-aws/merchant destroy"
+  }
+}

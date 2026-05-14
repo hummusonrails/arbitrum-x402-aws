@@ -11,3 +11,23 @@ cdp_api_key.json
 scratch/
 .vitest/
 coverage/
+
+# pnpm
+.pnpm-store/
+pnpm-debug.log*
+
+# uv / Python
+apps/agent/.venv/
+apps/agent/__pycache__/
+apps/agent/**/__pycache__/
+apps/agent/.pytest_cache/
+apps/agent/.ruff_cache/
+*.pyc
+
+# Workspace build artifacts
+apps/merchant/dist/
+apps/merchant/cdk.out/
+packages/*/dist/
+
+# Local plan/spec scratchpad (never committed)
+docs/superpowers/
