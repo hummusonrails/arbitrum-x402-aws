@@ -17,10 +17,28 @@ SUPPORTED_REGIONS = {"us-east-1", "us-west-2", "eu-central-1", "ap-southeast-2"}
 SUPPORTED_PROVIDERS = {"CoinbaseCDP", "StripePrivy"}
 
 
+def _repo_root() -> Path:
+    """Resolve the repo root from this file's location."""
+    # src/x402_aws_agent/config.py -> repo root is four levels up
+    return Path(__file__).resolve().parents[4]
+
+
 def _repo_root_env() -> Path:
     """Resolve the repo-root .env from this file's location."""
-    # src/x402_aws_agent/config.py -> repo root is four levels up
-    return Path(__file__).resolve().parents[4] / ".env"
+    return _repo_root() / ".env"
+
+
+def resolve_repo_relative(path_str: str) -> Path:
+    """Resolve a path string against the repo root if it is relative.
+
+    Absolute paths are returned as-is. Relative paths are anchored to the
+    repo root rather than the cwd, so callers behave the same whether
+    invoked from the repo root, apps/agent, or anywhere else.
+    """
+    p = Path(path_str)
+    if p.is_absolute():
+        return p
+    return (_repo_root() / p).resolve()
 
 
 def _require(name: str) -> str:

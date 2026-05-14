@@ -17,7 +17,11 @@ from pathlib import Path
 import boto3
 from bedrock_agentcore.payments import PaymentClient, PaymentManager
 
-from x402_aws_agent.config import SetupConfig, load_setup_config
+from x402_aws_agent.config import (
+    SetupConfig,
+    load_setup_config,
+    resolve_repo_relative,
+)
 
 
 def _read_cdp_credentials(api_key_file: Path) -> dict[str, str]:
@@ -75,7 +79,7 @@ def _bootstrap_resources(cfg: SetupConfig) -> dict[str, str]:
             "This demo wires up CoinbaseCDP. See apps/agent/README.md for adding StripePrivy."
         )
 
-    cdp_creds = _read_cdp_credentials(Path(cfg.cdp_api_key_file).resolve())
+    cdp_creds = _read_cdp_credentials(resolve_repo_relative(cfg.cdp_api_key_file))
     service_role_arn = _resolve_service_role_arn(cfg.region)
 
     payment_client = PaymentClient(region_name=cfg.region)
