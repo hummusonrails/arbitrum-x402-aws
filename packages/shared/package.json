@@ -1,0 +1,21 @@
+{
+  "name": "@x402-aws/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared x402 v2 protocol types and Arbitrum One network constants",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
