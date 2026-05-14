@@ -86,16 +86,23 @@ def _bootstrap_resources(cfg: SetupConfig) -> dict[str, str]:
 
     print(f"Creating PaymentManager + Connector in {cfg.region} ...")
     print(f"  Using service role: {service_role_arn}")
+    # AWS naming constraints:
+    #   PaymentManager name: ^[a-zA-Z][a-zA-Z0-9]{0,47}$ (strict alphanumeric)
+    #   PaymentManager description: ^[a-zA-Z0-9\s]+$ (alphanumeric + spaces only)
+    #   PaymentConnector name: alphanumeric + underscore, max 48
+    #   PaymentCredentialProvider name: alphanumeric + underscore + hyphen
+    # Use camelCase alphanumeric across the board to satisfy all four.
+    suffix = uuid.uuid4().hex[:8]
     pm_response = payment_client.create_payment_manager_with_connector(
-        payment_manager_name=f"x402-aws-demo-{uuid.uuid4().hex[:6]}",
-        payment_manager_description="x402-aws demo Payment Manager",
+        payment_manager_name=f"x402AwsDemo{suffix}",
+        payment_manager_description="x402 aws demo Payment Manager",
         authorizer_type="AWS_IAM",
         role_arn=service_role_arn,
         payment_connector_config={
-            "name": "x402-aws-demo-coinbase",
-            "description": "Coinbase CDP connector for x402-aws demo",
+            "name": f"x402AwsDemoCoinbase{suffix}",
+            "description": "Coinbase CDP connector for x402 aws demo",
             "payment_credential_provider_config": {
-                "name": f"x402-aws-cdp-{uuid.uuid4().hex[:6]}",
+                "name": f"x402AwsCdp{suffix}",
                 "credential_provider_vendor": "CoinbaseCDP",
                 "credentials": cdp_creds,
             },
