@@ -1,7 +1,8 @@
 {
-  "name": "x402-aws-provider",
+  "name": "@x402-aws/merchant",
   "version": "0.1.0",
   "private": true,
+  "description": "x402 merchant on AWS CloudFront with Lambda@Edge and the CDP facilitator",
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -9,7 +10,12 @@
     "cdk": "cdk",
     "synth": "cdk synth",
     "deploy": "cdk deploy",
-    "destroy": "cdk destroy"
+    "destroy": "cdk destroy",
+    "print-cdp-env": "ts-node scripts/print-cdp-env.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "@x402-aws/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
@@ -21,8 +27,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
-  },
-  "dependencies": {
-    "dotenv": "^16.4.5"
   }
 }

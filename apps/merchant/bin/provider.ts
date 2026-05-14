@@ -2,7 +2,7 @@
 import * as path from "node:path";
 import * as dotenv from "dotenv";
 // Load .env From Repo Root Not Provider Directory
-dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") });
+dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
 
 import * as cdk from "aws-cdk-lib";
 import { ProviderStack } from "../lib/provider-stack";
