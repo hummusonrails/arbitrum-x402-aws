@@ -1,7 +1,7 @@
 import type { CloudFrontRequestEvent, CloudFrontRequestResult } from "aws-lambda";
 import { buildPaymentRequirements } from "./build-requirements";
 import { verifyPayment, settlePayment } from "./facilitator";
-import { EdgeConfig } from "./types";
+import type { EdgeConfig } from "@x402-aws/shared";
 
 declare const __EDGE_CONFIG__: EdgeConfig;
 

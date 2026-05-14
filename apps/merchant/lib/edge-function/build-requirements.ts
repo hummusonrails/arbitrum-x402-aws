@@ -1,4 +1,4 @@
-import { EdgeConfig, PaymentRequirements } from "./types";
+import type { EdgeConfig, PaymentRequirements } from "@x402-aws/shared";
 
 export function buildPaymentRequirements(config: EdgeConfig, resourceUrl: string): PaymentRequirements {
   return {

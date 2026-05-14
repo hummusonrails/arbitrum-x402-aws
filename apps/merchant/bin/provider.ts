@@ -6,7 +6,7 @@ dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
 
 import * as cdk from "aws-cdk-lib";
 import { ProviderStack } from "../lib/provider-stack";
-import { NETWORK } from "../lib/networks";
+import { NETWORK } from "@x402-aws/shared";
 
 const app = new cdk.App();
 

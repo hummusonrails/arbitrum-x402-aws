@@ -7,7 +7,7 @@ import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import { NetworkConfig } from "./networks";
+import type { NetworkConfig } from "@x402-aws/shared";
 
 export interface ProviderStackProps extends cdk.StackProps {
   network: NetworkConfig;

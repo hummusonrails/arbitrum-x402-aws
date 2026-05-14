@@ -1,9 +1,9 @@
-import {
+import type {
   EdgeConfig,
   FacilitatorSettleResponse,
   FacilitatorVerifyResponse,
   PaymentRequirements,
-} from "./types";
+} from "@x402-aws/shared";
 import { mintJwt } from "./mint-jwt";
 
 function buildHeaders(config: EdgeConfig, url: string, method: string): Record<string, string> {
