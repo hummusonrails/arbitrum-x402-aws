@@ -18,6 +18,7 @@ x402-aws-agent-teardown = "x402_aws_agent.teardown:main"
 
 [dependency-groups]
 dev = [
+    "cdp-sdk==1.45.2",
     "pytest>=8.3.0",
     "pytest-mock>=3.14.0",
     "ruff>=0.6.0",
