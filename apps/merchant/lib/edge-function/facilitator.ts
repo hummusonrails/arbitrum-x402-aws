@@ -20,6 +20,11 @@ function buildHeaders(config: EdgeConfig, url: string, method: string): Record<s
   return headers;
 }
 
+// The CDP facilitator's x402V2PaymentRequirements wants `amount`, not `maxAmountRequired`.
+function toFacilitatorRequirements(requirements: PaymentRequirements): Record<string, unknown> {
+  return { ...requirements, amount: requirements.maxAmountRequired };
+}
+
 async function callFacilitator<T>(
   url: string,
   config: EdgeConfig,
@@ -29,7 +34,11 @@ async function callFacilitator<T>(
   const res = await fetch(url, {
     method: "POST",
     headers: buildHeaders(config, url, "POST"),
-    body: JSON.stringify({ paymentPayload, paymentRequirements: requirements }),
+    body: JSON.stringify({
+      x402Version: 2,
+      paymentPayload,
+      paymentRequirements: toFacilitatorRequirements(requirements),
+    }),
   });
   if (!res.ok) {
     const text = await res.text();

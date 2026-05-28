@@ -63,7 +63,11 @@ describe("verifyPayment", () => {
           "content-type": "application/json",
           authorization: "Bearer fake.jwt.token",
         }),
-        body: JSON.stringify({ paymentPayload, paymentRequirements: requirements }),
+        body: JSON.stringify({
+          x402Version: 2,
+          paymentPayload,
+          paymentRequirements: { ...requirements, amount: requirements.maxAmountRequired },
+        }),
       })
     );
   });

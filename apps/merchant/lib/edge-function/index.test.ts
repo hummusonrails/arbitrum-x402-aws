@@ -81,6 +81,42 @@ describe("edge handler", () => {
     expect(settlePayment).toHaveBeenCalled();
   });
 
+  it("normalizes an AgentCore PAYMENT-SIGNATURE envelope before calling the facilitator", async () => {
+    vi.mocked(verifyPayment).mockResolvedValue({ isValid: true });
+    vi.mocked(settlePayment).mockResolvedValue({ success: true, txHash: "0xabc" });
+
+    const envelope = {
+      x402Version: 2,
+      resource: null,
+      accepted: {
+        scheme: "exact",
+        network: "eip155:42161",
+        maxAmountRequired: "10000",
+        resource: "https://x.cloudfront.net/report",
+        payTo: "0xRECIPIENT",
+        maxTimeoutSeconds: 300,
+        asset: "0xUSDC",
+        extra: { name: "USD Coin", version: "2" },
+      },
+      extension: {},
+      payload: {
+        authorization: { from: "0xFROM", to: "0xRECIPIENT", value: "10000" },
+        signature: "0xsig",
+      },
+    };
+    const header = Buffer.from(JSON.stringify(envelope)).toString("base64");
+    const result = (await handler(buildEvent({ "payment-signature": header }))) as any;
+
+    expect(result.method).toBe("GET");
+    const forwarded = vi.mocked(verifyPayment).mock.calls[0][1] as any;
+    expect(forwarded.x402Version).toBe(2);
+    expect(forwarded.accepted.amount).toBe("10000");
+    expect(forwarded.payload.signature).toBe("0xsig");
+    // top-level resource/extension must be stripped (x402V2PaymentPayload rejects them)
+    expect("resource" in forwarded).toBe(false);
+    expect("extension" in forwarded).toBe(false);
+  });
+
   it("returns 402 with reason when verify fails", async () => {
     vi.mocked(verifyPayment).mockResolvedValue({ isValid: false, invalidReason: "nonce-used" });
 

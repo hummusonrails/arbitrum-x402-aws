@@ -33,6 +33,39 @@ function jsonResponse(status: string, body: unknown): CloudFrontRequestResult {
   };
 }
 
+// AgentCore returns the proof under PAYMENT-SIGNATURE; standard x402 clients use X-PAYMENT.
+function readPaymentHeader(request: CloudFrontRequestEvent["Records"][0]["cf"]["request"]): string | undefined {
+  return (
+    request.headers["payment-signature"]?.[0]?.value ??
+    request.headers["x-payment"]?.[0]?.value
+  );
+}
+
+// AgentCore's generate_payment_header emits an envelope the CDP facilitator rejects:
+// it nests requirements under `accepted` with `maxAmountRequired` and carries extra
+// top-level `resource`/`extension` keys. The facilitator's x402V2PaymentPayload allows
+// only {x402Version, accepted, payload} and the requirements need `amount`. Reshape it.
+function toFacilitatorPayload(decoded: unknown): unknown {
+  if (
+    typeof decoded !== "object" ||
+    decoded === null ||
+    !("accepted" in decoded) ||
+    typeof (decoded as Record<string, unknown>).accepted !== "object"
+  ) {
+    return decoded;
+  }
+  const env = decoded as Record<string, unknown>;
+  const accepted = { ...(env.accepted as Record<string, unknown>) };
+  if (accepted.amount === undefined && accepted.maxAmountRequired !== undefined) {
+    accepted.amount = accepted.maxAmountRequired;
+  }
+  return {
+    x402Version: env.x402Version,
+    accepted,
+    payload: env.payload,
+  };
+}
+
 export async function handler(event: CloudFrontRequestEvent): Promise<CloudFrontRequestResult> {
   const config = getConfig();
   const request = event.Records[0].cf.request;
@@ -40,7 +73,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
   const resourceUrl = `https://${host}${request.uri}`;
   const requirements = buildPaymentRequirements(config, resourceUrl);
 
-  const paymentHeader = request.headers["x-payment"]?.[0]?.value;
+  const paymentHeader = readPaymentHeader(request);
 
   if (!paymentHeader) {
     return jsonResponse("402", { x402Version: 2, accepts: [requirements], error: null });
@@ -49,7 +82,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
   let paymentPayload: unknown;
   try {
     const decoded = Buffer.from(paymentHeader, "base64").toString("utf8");
-    paymentPayload = JSON.parse(decoded);
+    paymentPayload = toFacilitatorPayload(JSON.parse(decoded));
   } catch {
     return jsonResponse("402", {
       x402Version: 2,
