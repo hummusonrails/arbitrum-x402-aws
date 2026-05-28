@@ -83,7 +83,9 @@ export class ProviderStack extends cdk.Stack {
         origin: apiOrigin,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+        // Must NOT forward the viewer Host header: the API Gateway execute-api origin
+        // rejects requests whose Host doesn't match its own domain with 403 Forbidden.
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         edgeLambdas: [
           {
             functionVersion: edgeFn.currentVersion,
