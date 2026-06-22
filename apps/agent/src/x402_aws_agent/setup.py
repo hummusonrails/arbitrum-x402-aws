@@ -2,12 +2,18 @@
 
 Run with: uv run x402-aws-agent-setup
 
+By default this REUSES the wallet already recorded in .env (PAYMENT_MANAGER_ARN
++ PAYMENT_INSTRUMENT_ID) and only mints a fresh PaymentSession, so re-running
+does not orphan a funded/granted wallet. Pass --force-new to create everything
+from scratch (a brand-new wallet that must be funded and granted again).
+
 Prints the resource IDs at the end. The user copies these into .env before
 running x402-aws-agent-run.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -22,6 +28,23 @@ from x402_aws_agent.config import (
     load_setup_config,
     resolve_repo_relative,
 )
+
+
+def _existing_ids() -> tuple[str | None, str | None]:
+    """Read the PAYMENT_MANAGER_ARN + PAYMENT_INSTRUMENT_ID already in the env."""
+    manager_arn = os.environ.get("PAYMENT_MANAGER_ARN", "").strip() or None
+    instrument_id = os.environ.get("PAYMENT_INSTRUMENT_ID", "").strip() or None
+    return manager_arn, instrument_id
+
+
+def should_reuse(
+    force_new: bool, manager_arn: str | None, instrument_id: str | None
+) -> bool:
+    """Reuse the existing wallet when both ids are present and --force-new is off.
+
+    Pure decision function so the reuse/create branch is unit-testable without AWS.
+    """
+    return bool(not force_new and manager_arn and instrument_id)
 
 
 def _read_cdp_credentials(api_key_file: Path) -> dict[str, str]:
@@ -72,7 +95,80 @@ def _resolve_service_role_arn(region: str) -> str:
     return f"arn:aws:iam::{account_id}:role/AgentCorePaymentsResourceRetrievalRole"
 
 
-def _bootstrap_resources(cfg: SetupConfig) -> dict[str, str]:
+def _prompt_funding(cfg: SetupConfig, wallet_address: str, redirect_url: str) -> None:
+    """Print the funding/grant instructions and wait for the user."""
+    print("\n" + "=" * 70)
+    print("ACTION REQUIRED: Fund the wallet and grant agent permissions")
+    print("=" * 70)
+    print(f"\nOpen this URL in your browser:\n\n  {redirect_url}\n")
+    print(
+        f"On Coinbase WalletHub:\n"
+        f"  1. Log in with the linked email\n"
+        f"     ({cfg.linked_email})\n"
+        f"  2. Grant signing permissions to the agent (delegated signing)\n"
+        f"  3. Bridge or transfer at least ${cfg.max_spend_usd} USDC to\n"
+        f"     the wallet address on Arbitrum One:\n"
+        f"     {wallet_address}\n"
+        f"     (use https://bridge.arbitrum.io for ETH-to-Arbitrum)\n"
+    )
+    input("Press Enter once funding and permissions are complete... ")
+
+
+def _create_session(manager: PaymentManager, cfg: SetupConfig) -> str:
+    """Create a PaymentSession and return its id."""
+    print(
+        f"\nCreating PaymentSession "
+        f"(budget ${cfg.max_spend_usd}, expiry {cfg.session_expiry_minutes}m) ..."
+    )
+    session_response = manager.create_payment_session(
+        user_id=cfg.user_id,
+        limits={"maxSpendAmount": {"value": cfg.max_spend_usd, "currency": "USD"}},
+        expiry_time_in_minutes=cfg.session_expiry_minutes,
+    )
+    session = session_response.get("paymentSession", session_response)
+    payment_session_id = session["paymentSessionId"]
+    print(f"  PaymentSession ID:     {payment_session_id}")
+    return payment_session_id
+
+
+def _reuse_resources(
+    cfg: SetupConfig, manager_arn: str, instrument_id: str
+) -> dict[str, str]:
+    """Reuse the existing manager + wallet; only mint a fresh session."""
+    print("Reusing the PaymentManager + wallet already in .env ...")
+    print(f"  PaymentManager ARN:    {manager_arn}")
+    print(f"  PaymentInstrument ID:  {instrument_id}")
+    print("  (pass --force-new to create a brand-new wallet instead)")
+
+    manager = PaymentManager(payment_manager_arn=manager_arn, region_name=cfg.region)
+    try:
+        instrument_response = manager.get_payment_instrument(
+            user_id=cfg.user_id, payment_instrument_id=instrument_id
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(
+            f"Could not fetch PaymentInstrument {instrument_id} on {manager_arn}: {exc}. "
+            "If these ids are stale, re-run with --force-new to create fresh resources."
+        ) from exc
+
+    instrument = instrument_response.get("paymentInstrument", instrument_response)
+    details = instrument["paymentInstrumentDetails"]["embeddedCryptoWallet"]
+    wallet_address = details.get("walletAddress")
+    redirect_url = details.get("redirectUrl")
+    print(f"  Wallet address:        {wallet_address}")
+
+    _prompt_funding(cfg, wallet_address, redirect_url)
+    payment_session_id = _create_session(manager, cfg)
+
+    return {
+        "PAYMENT_MANAGER_ARN": manager_arn,
+        "PAYMENT_INSTRUMENT_ID": instrument_id,
+        "PAYMENT_SESSION_ID": payment_session_id,
+    }
+
+
+def _create_resources(cfg: SetupConfig) -> dict[str, str]:
+    """Create a fresh manager + connector + instrument (new wallet) + session."""
     if cfg.provider != "CoinbaseCDP":
         raise NotImplementedError(
             f"Provider {cfg.provider} is not implemented in setup yet. "
@@ -145,34 +241,8 @@ def _bootstrap_resources(cfg: SetupConfig) -> dict[str, str]:
     print(f"  PaymentInstrument ID:  {payment_instrument_id}")
     print(f"  Wallet address:        {wallet_address}")
 
-    print("\n" + "=" * 70)
-    print("ACTION REQUIRED: Fund the wallet and grant agent permissions")
-    print("=" * 70)
-    print(f"\nOpen this URL in your browser:\n\n  {redirect_url}\n")
-    print(
-        f"On Coinbase WalletHub:\n"
-        f"  1. Log in with the linked email\n"
-        f"     ({cfg.linked_email})\n"
-        f"  2. Bridge or transfer at least ${cfg.max_spend_usd} USDC to\n"
-        f"     the wallet address on Arbitrum One:\n"
-        f"     {wallet_address}\n"
-        f"     (use https://bridge.arbitrum.io for ETH-to-Arbitrum)\n"
-        f"  3. Grant signing permissions to the agent\n"
-    )
-    input("Press Enter once funding and permissions are complete... ")
-
-    print(
-        f"\nCreating PaymentSession "
-        f"(budget ${cfg.max_spend_usd}, expiry {cfg.session_expiry_minutes}m) ..."
-    )
-    session_response = manager.create_payment_session(
-        user_id=cfg.user_id,
-        limits={"maxSpendAmount": {"value": cfg.max_spend_usd, "currency": "USD"}},
-        expiry_time_in_minutes=cfg.session_expiry_minutes,
-    )
-    session = session_response.get("paymentSession", session_response)
-    payment_session_id = session["paymentSessionId"]
-    print(f"  PaymentSession ID:     {payment_session_id}")
+    _prompt_funding(cfg, wallet_address, redirect_url)
+    payment_session_id = _create_session(manager, cfg)
 
     return {
         "PAYMENT_MANAGER_ARN": payment_manager_arn,
@@ -181,10 +251,29 @@ def _bootstrap_resources(cfg: SetupConfig) -> dict[str, str]:
     }
 
 
-def main() -> int:
+def _bootstrap_resources(cfg: SetupConfig, force_new: bool = False) -> dict[str, str]:
+    manager_arn, instrument_id = _existing_ids()
+    if should_reuse(force_new, manager_arn, instrument_id):
+        return _reuse_resources(cfg, manager_arn, instrument_id)
+    return _create_resources(cfg)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="x402-aws-agent-setup")
+    parser.add_argument(
+        "--force-new",
+        action="store_true",
+        help=(
+            "Create a brand-new wallet even if PAYMENT_MANAGER_ARN + "
+            "PAYMENT_INSTRUMENT_ID are already set in .env. The new wallet must "
+            "be funded and granted again; the old one is left untouched."
+        ),
+    )
+    args = parser.parse_args(argv)
+
     cfg = load_setup_config()
     try:
-        result = _bootstrap_resources(cfg)
+        result = _bootstrap_resources(cfg, force_new=args.force_new)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

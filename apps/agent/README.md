@@ -42,7 +42,7 @@ make teardown-agent
 
 | Script | What it does |
 |:-------|:-------------|
-| `x402-aws-agent-setup` | Creates `PaymentCredentialProvider` from CDP creds; creates `PaymentManager` + `PaymentConnector`; creates `PaymentInstrument` (embedded ETHEREUM wallet); prints the Coinbase WalletHub redirect URL and waits for you to fund + grant permissions; creates a `PaymentSession` with the configured budget |
+| `x402-aws-agent-setup` | Creates `PaymentCredentialProvider` from CDP creds; creates `PaymentManager` + `PaymentConnector`; creates `PaymentInstrument` (embedded ETHEREUM wallet); prints the Coinbase WalletHub redirect URL and waits for you to fund + grant permissions; creates a `PaymentSession` with the configured budget. **Reuses** the wallet already in `.env` (only mints a new session) unless `.env` has no `PAYMENT_*` ids or you pass `--force-new` |
 | `x402-aws-agent-run` | Reads the IDs from `.env`, GETs `RESOURCE_URL`, on 402 calls `PaymentManager.generate_payment_header()` and retries with the proof, prints the gated JSON |
 | `x402-aws-agent-teardown` | Deletes session, instrument, connectors, and manager. Run before re-running setup or to stop being billed for resource provisioning |
 
