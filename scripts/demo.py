@@ -324,8 +324,19 @@ def cmd_agent() -> int:
 # ----------------------------------------------------------------------------
 
 
-def cmd_preflight() -> int:
-    banner("PRE-FLIGHT · run ~15 min before going live", color=YELLOW)
+def _share_screen_reminders() -> None:
+    warn("Before you share your screen:")
+    print(f"     {GREY}- Close .env and cdp_api_key.json in your editor{RESET}")
+    print(f"     {GREY}- Clear terminal scrollback (Cmd+K) so no secrets are visible{RESET}")
+    print(f"     {GREY}- Bump terminal font size for readability{RESET}")
+    print(f"     {GREY}- Pre-open browser tabs: Arbiscan (wallet), CDP, AWS console{RESET}")
+
+
+def _preflight() -> bool:
+    """Non-shown prep: verify staged pieces, refresh the session, smoke-test.
+
+    Returns True when everything is ready for the live run.
+    """
     cfg = load_run_config()
     pm = PaymentManager(
         payment_manager_arn=cfg.payment_manager_arn, region_name=cfg.region
@@ -337,7 +348,7 @@ def cmd_preflight() -> int:
         ok(f"{cfg.resource_url} -> 402")
     else:
         fail(f"Expected 402, got {code}. CloudFront may be down or mis-deployed.")
-        return 1
+        return False
 
     section("2. Agent wallet is funded")
     addr = wallet_address(pm, cfg)
@@ -346,10 +357,10 @@ def cmd_preflight() -> int:
     kv("USDC balance", f"${bal:.4f}")
     if bal <= 0.02:
         fail("Wallet has insufficient USDC. Fund it before the demo.")
-        return 1
+        return False
     ok(f"Funded (~{int(bal / 0.01)} payments of headroom)")
 
-    section("3. Mint a fresh PaymentSession (today's is expired)")
+    section("3. Mint a fresh PaymentSession (sessions expire after 60 min)")
     sid = mint_session(pm, cfg)
     write_session_to_env(sid)
     ok(f"New session written to .env: {sid}")
@@ -361,34 +372,71 @@ def cmd_preflight() -> int:
         fail(f"Smoke-test payment failed: {exc}")
         warn("If 'Delegated signing grant is not active': re-grant the wallet at "
              "its WalletHub URL (scripts/inspect_instrument.py prints it).")
-        return 1
+        return False
     if resp.status_code == 200:
         tx = resp.json_body.get("txHash") or resp.json_body.get("tx_hash") or "(none)"
         ok(f"Paid + settled. Status 200. tx: {tx}")
     else:
         fail(f"Smoke test returned {resp.status_code}, not 200.")
-        return 1
+        return False
 
     section("5. Mint a clean session for the live run")
     sid2 = mint_session(pm, cfg)
     write_session_to_env(sid2)
     ok(f"Live-run session written to .env: {sid2}")
 
-    banner("✅ READY FOR LIVE DEMO", color=GREEN)
+    banner("✅ READY", color=GREEN)
     kv("Merchant", cfg.resource_url)
     kv("Agent wallet", addr or "unknown")
     kv("USDC balance", f"${usdc_balance(addr):.4f}" if addr else "?")
-    print()
-    warn("Before you share your screen:")
-    print(f"     {GREY}- Close .env and cdp_api_key.json in your editor{RESET}")
-    print(f"     {GREY}- Clear terminal scrollback (Cmd+K) so no secrets are visible{RESET}")
-    print(f"     {GREY}- Bump terminal font size for readability{RESET}")
-    print(f"     {GREY}- Pre-open browser tabs: Arbiscan (wallet), CDP, AWS console{RESET}")
-    print(f"\n  Then run: {BOLD}make demo-provider{RESET}  and  {BOLD}make demo-agent{RESET}\n")
+    return True
+
+
+def cmd_demo() -> int:
+    """THE single entry point: pre-flight, then walk segments 3 and 4 live."""
+    banner("LIVE DEMO · x402 on Arbitrum + AWS", "one command, full walkthrough", CYAN)
+    narrate(
+        "Step 1 is pre-flight. Run this BEFORE you share your screen: it refreshes "
+        "the payment session and runs one real $0.01 smoke test to prove the whole "
+        "path works. If it fails, you find out now, not on camera."
+    )
+    if not _preflight():
+        fail("Pre-flight failed. Fix the issue above, then run `make demo` again.")
+        return 1
+
+    banner("✋ SHARE YOUR SCREEN NOW", "(pre-flight passed; the show begins next)", YELLOW)
+    _share_screen_reminders()
+    pause("screen shared and ready? Enter to begin SEGMENT 3 (provider)")
+
+    rc = cmd_provider()
+    if rc:
+        return rc
+
+    pause("Enter to begin SEGMENT 4 (the agent pays, live)")
+    rc = cmd_agent()
+    if rc:
+        return rc
+
+    banner("DEMO COMPLETE", "open the Arbiscan link; back to you + Q&A", CYAN)
     return 0
 
 
-COMMANDS = {"preflight": cmd_preflight, "provider": cmd_provider, "agent": cmd_agent}
+def cmd_preflight() -> int:
+    banner("PRE-FLIGHT (standalone) · dress rehearsal", color=YELLOW)
+    if not _preflight():
+        return 1
+    print()
+    _share_screen_reminders()
+    print(f"\n  Single entry point for the live run: {BOLD}make demo{RESET}\n")
+    return 0
+
+
+COMMANDS = {
+    "demo": cmd_demo,
+    "preflight": cmd_preflight,
+    "provider": cmd_provider,
+    "agent": cmd_agent,
+}
 
 
 def main(argv: list[str] | None = None) -> int:
