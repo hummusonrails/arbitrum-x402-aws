@@ -158,7 +158,7 @@ make run-agent
 make test
 ```
 
-26 tests: 17 in the merchant (vitest), 2 in `@x402-aws/shared` (vitest), 7 in the agent (pytest).
+34 tests: 18 in the merchant (vitest), 2 in `@x402-aws/shared` (vitest), 14 in the agent (pytest).
 
 ## Stack
 
