@@ -1,15 +1,16 @@
-"""Guided, presentation-grade walkthrough of the x402 demo.
+"""Guided, presentation-grade walkthrough of the x402 demo (Rich edition).
 
 This is the live "deck" for the provider and agent segments of the webinar.
-It runs the REAL flow (real 402, real on-chain USDC settlement) but wraps each
-step in large, readable, instructive output with narration and pauses so an
-audience can follow along.
+It runs the REAL flow (real 402, real on-chain USDC settlement) but renders it
+as a sequence of beautiful, slide-like screens with a branded palette,
+syntax-highlighted JSON, a gradient headline, and an Enter-to-advance rhythm.
 
 Run via the make targets (which use apps/agent's uv environment):
 
-    make demo-preflight   # ~15 min before going live: refresh + smoke-test
-    make demo-provider    # segment 3: the 402 / payment-terms side
-    make demo-agent       # segment 4: pay + settle on Arbitrum One
+    make demo             # THE entry point: pre-flight -> segments 3 + 4
+    make demo-preflight   # escape hatch: prep + smoke-test only
+    make demo-provider    # escape hatch: segment 3 only
+    make demo-agent       # escape hatch: segment 4 only
 
 Direct:  cd apps/agent && uv run python ../../scripts/demo.py <cmd> [--auto]
 
@@ -19,15 +20,23 @@ Only public data (merchant URL, wallet address, recipient, tx hash, ids).
 
 from __future__ import annotations
 
+import json
 import os
-import shutil
 import sys
-import textwrap
 import uuid
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+from rich import box
+from rich.align import Align
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.rule import Rule
+from rich.syntax import Syntax
+from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = REPO_ROOT / ".env"
@@ -42,88 +51,101 @@ ARB_RPC = "https://arb1.arbitrum.io/rpc"
 USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
 
 # ----------------------------------------------------------------------------
-# Presentation helpers
+# Brand palette + console
 # ----------------------------------------------------------------------------
 
-_USE_COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+BLUE = "#12AAFF"     # Arbitrum
+PURPLE = "#8B5CF6"   # x402
+AMBER = "#FF9900"    # AWS
+CDP = "#1652F0"      # Coinbase
+GREEN = "#22C55E"
+RED = "#EF4444"
+SLATE = "#94A3B8"
 
+THEME = Theme(
+    {
+        "brand.blue": BLUE,
+        "brand.purple": PURPLE,
+        "brand.amber": AMBER,
+        "brand.cdp": CDP,
+        "ok": f"bold {GREEN}",
+        "warn": f"bold {AMBER}",
+        "err": f"bold {RED}",
+        "muted": SLATE,
+        "val": f"bold {BLUE}",
+        "key": "bold white",
+    }
+)
 
-def _c(code: str) -> str:
-    return code if _USE_COLOR else ""
-
-
-RESET = _c("\033[0m")
-BOLD = _c("\033[1m")
-DIM = _c("\033[2m")
-CYAN = _c("\033[36m")
-GREEN = _c("\033[32m")
-YELLOW = _c("\033[33m")
-MAGENTA = _c("\033[35m")
-BLUE = _c("\033[34m")
-RED = _c("\033[31m")
-GREY = _c("\033[90m")
-
+console = Console(theme=THEME, highlight=False)
 _AUTO = False
 
 
-def _width() -> int:
-    return min(shutil.get_terminal_size((80, 24)).columns, 84)
+def slide_w() -> int:
+    return min(max(console.size.width - 4, 60), 92)
 
 
-def banner(title: str, subtitle: str = "", color: str = CYAN) -> None:
-    w = _width()
-    line = "═" * w
-    print("\n" + color + line + RESET)
-    print(color + BOLD + title.center(w) + RESET)
-    if subtitle:
-        print(color + subtitle.center(w) + RESET)
-    print(color + line + RESET + "\n")
-
-
-def section(text: str, color: str = MAGENTA) -> None:
-    print("\n" + color + BOLD + "▶ " + text + RESET)
-    print(color + DIM + "─" * min(len(text) + 2, _width()) + RESET)
-
-
-def narrate(text: str, color: str = "") -> None:
-    w = _width() - 2
-    for para in text.strip().split("\n\n"):
-        wrapped = textwrap.fill(" ".join(para.split()), width=w)
-        print((color or "") + textwrap.indent(wrapped, "  ") + (RESET if color else ""))
-        print()
-
-
-def kv(label: str, value: str, note: str = "") -> None:
-    tail = f"   {GREY}{note}{RESET}" if note else ""
-    print(f"  {BOLD}{label:<22}{RESET}{CYAN}{value}{RESET}{tail}")
-
-
-def ok(text: str) -> None:
-    print(f"  {GREEN}✓{RESET} {text}")
-
-
-def warn(text: str) -> None:
-    print(f"  {YELLOW}!{RESET} {text}")
-
-
-def fail(text: str) -> None:
-    print(f"  {RED}✗ {text}{RESET}")
-
-
-def pause(msg: str = "Press Enter to continue") -> None:
+def pause(msg: str = "press Enter to continue  ▸") -> None:
     if _AUTO:
         return
     try:
-        input(f"\n{DIM}   [{msg}]{RESET} ")
+        console.input(f"\n   [muted]{msg}[/muted]  ")
     except (EOFError, KeyboardInterrupt):
-        print()
         raise SystemExit(0)
 
 
-def diagram(lines: list[str], color: str = BLUE) -> None:
-    for ln in lines:
-        print("  " + color + ln + RESET)
-    print()
+def show(renderable, *, top: int = 1, advance: bool = True) -> None:
+    """Clear the screen and present one centered renderable as a slide."""
+    console.clear()
+    console.print("\n" * top, end="")
+    console.print(Align.center(renderable))
+    if advance:
+        pause()
+
+
+def deck_panel(
+    renderable,
+    *,
+    title: str | None = None,
+    subtitle: str | None = None,
+    border: str = "brand.blue",
+    box_=box.HEAVY,
+    pad=(2, 5),
+) -> Panel:
+    return Panel(
+        renderable,
+        title=title,
+        subtitle=subtitle,
+        title_align="center",
+        subtitle_align="center",
+        border_style=border,
+        box=box_,
+        padding=pad,
+        width=slide_w(),
+    )
+
+
+def headline(token: str, colors: list[str]):
+    try:
+        from rich_pyfiglet import RichFiglet
+
+        return RichFiglet(token, font="slant", colors=colors, justify="center")
+    except Exception:  # noqa: BLE001
+        return Text(token, style=f"bold {colors[0]}", justify="center")
+
+
+def title_slide(subtitle: str, tagline: str, colors: list[str], border: str) -> None:
+    group = Group(
+        headline("x402", colors),
+        Text(""),
+        Text(subtitle, style=f"bold {colors[-1]}", justify="center"),
+        Text(tagline, style="muted", justify="center"),
+    )
+    show(deck_panel(group, border=border, pad=(2, 6)))
+
+
+def para(text: str, justify: str = "left") -> Text:
+    return Text(" ".join(text.split()), justify=justify)
 
 
 # ----------------------------------------------------------------------------
@@ -140,8 +162,7 @@ def usdc_balance(address: str) -> float:
         "params": [{"to": USDC, "data": data}, "latest"],
     }
     r = httpx.post(ARB_RPC, json=payload, timeout=15.0)
-    raw = int(r.json()["result"], 16)
-    return raw / 1_000_000
+    return int(r.json()["result"], 16) / 1_000_000
 
 
 def wallet_address(pm: PaymentManager, cfg) -> str | None:
@@ -153,25 +174,26 @@ def wallet_address(pm: PaymentManager, cfg) -> str | None:
 
 
 def mint_session(pm: PaymentManager, cfg) -> str:
-    max_spend = os.environ["AGENTCORE_MAX_SPEND_USD"]
-    expiry = int(os.environ["AGENTCORE_SESSION_EXPIRY_MINUTES"])
     resp = pm.create_payment_session(
         user_id=cfg.user_id,
-        limits={"maxSpendAmount": {"value": max_spend, "currency": "USD"}},
-        expiry_time_in_minutes=expiry,
+        limits={
+            "maxSpendAmount": {
+                "value": os.environ["AGENTCORE_MAX_SPEND_USD"],
+                "currency": "USD",
+            }
+        },
+        expiry_time_in_minutes=int(os.environ["AGENTCORE_SESSION_EXPIRY_MINUTES"]),
     )
     return resp.get("paymentSession", resp)["paymentSessionId"]
 
 
 def write_session_to_env(session_id: str) -> None:
     lines = ENV_PATH.read_text().splitlines()
-    found = False
     for i, ln in enumerate(lines):
         if ln.startswith("PAYMENT_SESSION_ID="):
             lines[i] = f"PAYMENT_SESSION_ID={session_id}"
-            found = True
             break
-    if not found:
+    else:
         lines.append(f"PAYMENT_SESSION_ID={session_id}")
     ENV_PATH.write_text("\n".join(lines) + "\n")
 
@@ -191,6 +213,18 @@ def pay(cfg, session_id: str):
         )
 
 
+def json_panel(obj, title: str, border: str = "brand.blue") -> Panel:
+    code = Syntax(
+        json.dumps(obj, indent=2),
+        "json",
+        theme="monokai",
+        word_wrap=True,
+        padding=(1, 3),
+        background_color="default",
+    )
+    return deck_panel(code, title=title, border=border, pad=(1, 3))
+
+
 # ----------------------------------------------------------------------------
 # Segment 3: provider side
 # ----------------------------------------------------------------------------
@@ -198,57 +232,84 @@ def pay(cfg, session_id: str):
 
 def cmd_provider() -> int:
     cfg = load_run_config()
-    banner("x402 · THE PROVIDER SIDE", "How a server asks an agent to pay", CYAN)
+    title_slide("The Provider Side", "How a server asks an agent to pay",
+                [BLUE, PURPLE], "brand.blue")
 
-    narrate(
-        "HTTP has always had a status code reserved for this moment: 402 Payment "
-        "Required. For 30 years it sat unused. x402 finally gives it a job."
+    # Concept
+    body = Group(
+        para("HTTP has always had a status code reserved for this moment: "
+             "402 Payment Required. For 30 years it sat unused. x402 gives it a job."),
+        Text(""),
+        para("Our merchant is a normal-looking API on AWS. A request with no "
+             "payment does not get the data. It gets a 402 and a machine-readable "
+             "invoice telling the caller exactly how to pay."),
     )
-    narrate(
-        "Our merchant is a normal-looking API on AWS. A request with no payment "
-        "does not get the data, it gets a 402 plus a machine-readable invoice "
-        "telling the caller exactly how to pay."
-    )
-    diagram(
-        [
-            "┌────────┐   GET /report  (no payment)   ┌──────────────┐",
-            "│ Client │ ────────────────────────────▶ │  CloudFront  │",
-            "│ /Agent │ ◀──────────────────────────── │ +Lambda@Edge │",
-            "└────────┘   402  +  payment terms        └──────────────┘",
-            "                                          (viewer-request)",
-        ]
-    )
-    narrate(
-        "The 402 is produced at the edge by a Lambda@Edge viewer-request function, "
-        "before the request ever reaches the origin. No payment, no origin call."
-    )
-    pause("hit the endpoint live")
+    show(deck_panel(body, title="[brand.purple]402 Payment Required[/]",
+                    border="brand.purple"))
 
-    section("Calling the gated resource with NO payment")
-    kv("GET", cfg.resource_url)
+    # Architecture
+    diagram = Align.center(Text.from_markup(
+        "[key]Client / Agent[/key]\n"
+        "     │\n"
+        "     │  GET /report  [muted](no payment)[/]\n"
+        "     ▼\n"
+        "[key]CloudFront[/] + [brand.amber]Lambda@Edge[/]  [muted](viewer-request)[/]\n"
+        "     │\n"
+        "     ▼\n"
+        "[warn]402[/]  +  payment terms  [muted](a JSON invoice)[/]",
+        justify="left",
+    ))
+    show(deck_panel(
+        Group(diagram, Text(""),
+              para("The 402 is produced at the edge, before the request ever "
+                   "reaches the origin. No payment, no origin call, no cost.",
+                   justify="center")),
+        title="[brand.amber]At the edge[/]", border="brand.amber"))
+
+    # Live: hit the endpoint
+    console.clear()
+    console.print("\n")
+    console.rule("[brand.blue]Calling the gated resource with NO payment[/]",
+                 style="brand.blue")
+    console.print()
+    console.print(Align.center(Text(f"GET  {cfg.resource_url}", style="muted")))
     r = httpx.get(cfg.resource_url, timeout=20.0)
-    color = GREEN if r.status_code == 402 else RED
-    print(f"\n  {BOLD}HTTP status:{RESET} {color}{BOLD}{r.status_code} "
-          f"{'Payment Required' if r.status_code == 402 else ''}{RESET}\n")
+    big = "402  ·  Payment Required" if r.status_code == 402 else f"{r.status_code}"
+    style = "warn" if r.status_code == 402 else "err"
+    console.print(Align.center(deck_panel(
+        Text(big, style=style, justify="center"),
+        border="brand.amber", box_=box.DOUBLE, pad=(1, 4))))
+    pause()
+
     body = r.json()
     terms = body["accepts"][0]
-
-    section("The payment terms (this is the invoice)")
     amt = int(terms["maxAmountRequired"]) / 1_000_000
-    kv("scheme", terms["scheme"], "pay this exact amount")
-    kv("network", terms["network"], "Arbitrum One (CAIP-2)")
-    kv("price", f"{terms['maxAmountRequired']} base units", f"= ${amt:.2f} USDC (6 decimals)")
-    kv("asset", terms["asset"], "native USDC on Arbitrum One")
-    kv("payTo", terms["payTo"], "the merchant's payout address")
-    kv("resource", terms["resource"])
-    kv("x402Version", str(body["x402Version"]))
-    print()
-    narrate(
-        "Everything an agent needs to pay is in this JSON: which chain, which "
-        "token, how much, and who to pay. No human, no checkout page, no API key. "
-        "An agent can read this and settle it on its own. That is segment 4."
-    )
-    banner("PROVIDER SIDE: the door is locked until payment", color=YELLOW)
+
+    table = Table(box=box.SIMPLE_HEAVY, show_edge=False, expand=False,
+                  header_style=f"bold {BLUE}", pad_edge=False)
+    table.add_column("Field", style="key", no_wrap=True)
+    table.add_column("Value", style="val")
+    table.add_column("What it means", style="muted")
+    table.add_row("scheme", terms["scheme"], "pay this exact amount")
+    table.add_row("network", terms["network"], "Arbitrum One (CAIP-2)")
+    table.add_row("price", terms["maxAmountRequired"], f"= ${amt:.2f} USDC (6 decimals)")
+    table.add_row("asset", terms["asset"], "native USDC on Arbitrum One")
+    table.add_row("payTo", terms["payTo"], "the merchant's payout address")
+    table.add_row("resource", terms["resource"], "what you are buying")
+    show(deck_panel(Align.center(table),
+                    title="[brand.blue]The payment terms · a machine-readable invoice[/]"))
+
+    # Raw response
+    show(json_panel(body, "[brand.blue]The actual 402 response body[/]"))
+
+    # Close
+    show(deck_panel(
+        para("Everything an agent needs to pay is in that JSON: which chain, "
+             "which token, how much, and who to pay. No human, no checkout, no "
+             "API key. The door is locked until payment. Next: the agent opens it.",
+             justify="center"),
+        title="[warn]Locked until payment[/]", border="brand.amber"),
+        advance=False)
     return 0
 
 
@@ -259,175 +320,206 @@ def cmd_provider() -> int:
 
 def cmd_agent() -> int:
     cfg = load_run_config()
-    banner("x402 · THE AGENT SIDE", "Pay the 402 and settle on Arbitrum One", GREEN)
+    title_slide("The Agent Side", "Pay the 402 and settle on Arbitrum One",
+                [PURPLE, GREEN], "brand.purple")
 
-    narrate(
-        "Now the buyer. Our agent runs on AWS Bedrock AgentCore, which gives it an "
-        "embedded crypto wallet (backed by Coinbase CDP) and a spending budget."
-    )
-    diagram(
-        [
-            "Agent ─GET─▶ 402 ─▶ AgentCore signs EIP-3009 ─▶ retry w/ X-PAYMENT",
-            "                     (from the embedded wallet,        │",
-            "                      within the session budget)       ▼",
-            "  200 + data ◀─ CDP facilitator verify + settle ◀──────┘",
-            "                          │",
-            "                          ▼  USDC moves on Arbitrum One",
-            "                     Arbiscan tx",
-        ],
-        color=GREEN,
-    )
-    narrate(
-        "The signature is an EIP-3009 transferWithAuthorization: the wallet "
-        "authorizes a USDC transfer without holding ETH for gas. The merchant's "
-        "edge function hands that proof to the CDP facilitator, which verifies it "
-        "and settles it on-chain. Then, and only then, the data is returned."
-    )
-    kv("PaymentSession", cfg.payment_session_id, "budgeted, time-limited")
-    kv("Wallet instrument", cfg.payment_instrument_id, "the agent's embedded wallet")
-    pause("run the live payment")
+    show(deck_panel(
+        para("The buyer is an agent running on AWS Bedrock AgentCore. AgentCore "
+             "gives it an embedded crypto wallet, backed by Coinbase CDP, and a "
+             "spending budget. Watch it pay the 402 on its own.", justify="center"),
+        title="[brand.purple]The autonomous buyer[/]", border="brand.purple"))
 
-    section("Agent requests the resource, pays, and retries")
-    print(f"  {DIM}GET {cfg.resource_url}{RESET}")
-    print(f"  {DIM}... 402 received, signing payment, retrying ...{RESET}\n")
+    flow = Align.center(Text.from_markup(
+        "[key]Agent[/key]  ──GET──▶  [warn]402[/]\n"
+        "   │\n"
+        "   ▼  AgentCore signs [key]EIP-3009[/]  [muted](gasless USDC authorization)[/]\n"
+        "[key]X-PAYMENT[/]  ──retry──▶  [brand.amber]Lambda@Edge[/]\n"
+        "   │\n"
+        "   ▼  [brand.cdp]CDP facilitator[/]: verify + settle\n"
+        "[ok]USDC moves on Arbitrum One[/]  ──▶  [key]200 + gated JSON[/]",
+        justify="left",
+    ))
+    show(deck_panel(flow, title="[brand.purple]Pay and retry[/]", border="brand.purple"))
+
+    ids = Table(box=None, show_header=False, pad_edge=False)
+    ids.add_column(style="key", no_wrap=True)
+    ids.add_column(style="val")
+    ids.add_row("PaymentSession ", cfg.payment_session_id)
+    ids.add_row("Wallet instrument ", cfg.payment_instrument_id)
+    show(deck_panel(
+        Group(Align.center(ids), Text(""),
+              para("Budgeted and time-limited. When you press Enter, the agent "
+                   "really pays, on Arbitrum One mainnet.", justify="center")),
+        title="[brand.purple]Ready to pay[/]", border="brand.purple"))
+
+    # Live payment with a spinner
+    console.clear()
+    console.print("\n\n")
     try:
-        resp = pay(cfg, cfg.payment_session_id)
+        with console.status(
+            Text("Signing EIP-3009 authorization and settling on Arbitrum One…",
+                 style="brand.amber"),
+            spinner="dots",
+        ):
+            resp = pay(cfg, cfg.payment_session_id)
     except Exception as exc:  # noqa: BLE001
-        fail(f"Payment failed: {exc}")
-        warn("Recovery: `make demo-preflight` mints a fresh session and re-tests.")
+        show(deck_panel(
+            Group(Text("Payment failed", style="err", justify="center"), Text(""),
+                  para(str(exc), justify="center"), Text(""),
+                  para("Recovery: run `make demo-preflight` to mint a fresh session "
+                       "and re-test the path.", justify="center")),
+            title="[err]Error[/]", border="err"), advance=False)
         return 1
 
-    color = GREEN if resp.status_code == 200 else RED
-    print(f"  {BOLD}HTTP status:{RESET} {color}{BOLD}{resp.status_code}{RESET}\n")
+    if resp.status_code == 200:
+        show(Align.center(headline("PAID", [GREEN, BLUE])), top=2)
+    else:
+        show(deck_panel(Text(str(resp.status_code), style="err", justify="center"),
+                        title="[err]Unexpected status[/]", border="err"), advance=False)
+        return 1
 
-    section("The gated data (paid for, on-chain)")
-    import json
+    # The gated data
+    show(json_panel(resp.json_body, "[ok]The gated data · paid for, on-chain[/]",
+                    border="ok"))
 
-    body = resp.json_body
-    for line in json.dumps(body, indent=2).splitlines():
-        print("  " + line)
-
-    tx = body.get("txHash") or body.get("tx_hash")
+    tx = resp.json_body.get("txHash") or resp.json_body.get("tx_hash")
     if tx:
-        banner("SETTLED ON ARBITRUM ONE", color=GREEN)
-        kv("Arbiscan", f"https://arbiscan.io/tx/{tx}")
-        narrate(
-            "That link is the real, public, on-chain USDC transfer from the agent's "
-            "wallet to the merchant. Open it: an autonomous agent just bought data "
-            "and paid for it, settled in seconds for a fraction of a cent."
-        )
+        link = Text(f"https://arbiscan.io/tx/{tx}", style=f"bold {BLUE}", justify="center")
+        show(deck_panel(
+            Group(Text("Settled on Arbitrum One", style="ok", justify="center"),
+                  Text(""), link, Text(""),
+                  para("A real, public, on-chain USDC transfer from the agent's "
+                       "wallet to the merchant. An autonomous agent just bought "
+                       "data and paid for it, in seconds, for a fraction of a cent.",
+                       justify="center")),
+            title="[ok]Settlement[/]", border="ok"), advance=False)
     return 0
 
 
 # ----------------------------------------------------------------------------
-# Pre-flight: run ~15 min before going live
+# Pre-flight + the single entry point
 # ----------------------------------------------------------------------------
 
 
-def _share_screen_reminders() -> None:
-    warn("Before you share your screen:")
-    print(f"     {GREY}- Close .env and cdp_api_key.json in your editor{RESET}")
-    print(f"     {GREY}- Clear terminal scrollback (Cmd+K) so no secrets are visible{RESET}")
-    print(f"     {GREY}- Bump terminal font size for readability{RESET}")
-    print(f"     {GREY}- Pre-open browser tabs: Arbiscan (wallet), CDP, AWS console{RESET}")
+def _step(n: int, label: str) -> None:
+    console.print(f"\n[brand.amber]{n}[/]  [key]{label}[/]")
 
 
 def _preflight() -> bool:
-    """Non-shown prep: verify staged pieces, refresh the session, smoke-test.
-
-    Returns True when everything is ready for the live run.
-    """
     cfg = load_run_config()
-    pm = PaymentManager(
-        payment_manager_arn=cfg.payment_manager_arn, region_name=cfg.region
-    )
+    pm = PaymentManager(payment_manager_arn=cfg.payment_manager_arn, region_name=cfg.region)
 
-    section("1. Merchant is live and returns 402")
+    _step(1, "Merchant is live and returns 402")
     code = httpx.get(cfg.resource_url, timeout=20.0).status_code
-    if code == 402:
-        ok(f"{cfg.resource_url} -> 402")
-    else:
-        fail(f"Expected 402, got {code}. CloudFront may be down or mis-deployed.")
+    if code != 402:
+        console.print(f"   [err]✗ expected 402, got {code}, CloudFront down or mis-deployed[/]")
         return False
+    console.print(f"   [ok]✓[/] {cfg.resource_url} → 402")
 
-    section("2. Agent wallet is funded")
+    _step(2, "Agent wallet is funded")
     addr = wallet_address(pm, cfg)
     bal = usdc_balance(addr) if addr else 0.0
-    kv("Wallet", addr or "unknown")
-    kv("USDC balance", f"${bal:.4f}")
+    console.print(f"   [muted]wallet[/] [val]{addr}[/]")
     if bal <= 0.02:
-        fail("Wallet has insufficient USDC. Fund it before the demo.")
+        console.print(f"   [err]✗ only ${bal:.4f} USDC. Fund the wallet before the demo[/]")
         return False
-    ok(f"Funded (~{int(bal / 0.01)} payments of headroom)")
+    console.print(f"   [ok]✓[/] ${bal:.4f} USDC  [muted](~{int(bal / 0.01)} payments)[/]")
 
-    section("3. Mint a fresh PaymentSession (sessions expire after 60 min)")
-    sid = mint_session(pm, cfg)
+    _step(3, "Mint a fresh PaymentSession")
+    with console.status("minting…", spinner="dots"):
+        sid = mint_session(pm, cfg)
     write_session_to_env(sid)
-    ok(f"New session written to .env: {sid}")
+    console.print(f"   [ok]✓[/] {sid}")
 
-    section("4. Real end-to-end smoke test (one $0.01 payment)")
+    _step(4, "Real end-to-end smoke test (one $0.01 payment)")
     try:
-        resp = pay(cfg, sid)
+        with console.status("paying + settling on Arbitrum One…", spinner="dots"):
+            resp = pay(cfg, sid)
     except Exception as exc:  # noqa: BLE001
-        fail(f"Smoke-test payment failed: {exc}")
-        warn("If 'Delegated signing grant is not active': re-grant the wallet at "
-             "its WalletHub URL (scripts/inspect_instrument.py prints it).")
+        console.print(f"   [err]✗ smoke test failed: {exc}[/]")
+        console.print("   [muted]If 'grant is not active': re-grant via "
+                      "scripts/inspect_instrument.py[/]")
         return False
-    if resp.status_code == 200:
-        tx = resp.json_body.get("txHash") or resp.json_body.get("tx_hash") or "(none)"
-        ok(f"Paid + settled. Status 200. tx: {tx}")
-    else:
-        fail(f"Smoke test returned {resp.status_code}, not 200.")
+    if resp.status_code != 200:
+        console.print(f"   [err]✗ got {resp.status_code}, expected 200[/]")
         return False
+    tx = resp.json_body.get("txHash") or resp.json_body.get("tx_hash") or "(none)"
+    console.print(f"   [ok]✓[/] settled · status 200 · tx {tx}")
 
-    section("5. Mint a clean session for the live run")
+    _step(5, "Mint a clean session for the live run")
     sid2 = mint_session(pm, cfg)
     write_session_to_env(sid2)
-    ok(f"Live-run session written to .env: {sid2}")
-
-    banner("✅ READY", color=GREEN)
-    kv("Merchant", cfg.resource_url)
-    kv("Agent wallet", addr or "unknown")
-    kv("USDC balance", f"${usdc_balance(addr):.4f}" if addr else "?")
+    console.print(f"   [ok]✓[/] {sid2}")
     return True
 
 
-def cmd_demo() -> int:
-    """THE single entry point: pre-flight, then walk segments 3 and 4 live."""
-    banner("LIVE DEMO · x402 on Arbitrum + AWS", "one command, full walkthrough", CYAN)
-    narrate(
-        "Step 1 is pre-flight. Run this BEFORE you share your screen: it refreshes "
-        "the payment session and runs one real $0.01 smoke test to prove the whole "
-        "path works. If it fails, you find out now, not on camera."
+def _share_reminders() -> Group:
+    return Group(
+        Text("Before you share your screen:", style="warn", justify="center"),
+        Text(""),
+        Text("•  Close .env and cdp_api_key.json in your editor", style="muted", justify="center"),
+        Text("•  Clear terminal scrollback  (Cmd+K)", style="muted", justify="center"),
+        Text("•  Bump terminal font size for readability", style="muted", justify="center"),
+        Text("•  Pre-open tabs: Arbiscan (wallet), CDP, AWS console", style="muted", justify="center"),
     )
+
+
+def cmd_preflight() -> int:
+    console.clear()
+    console.print(Align.center(deck_panel(
+        Text("PRE-FLIGHT  ·  dress rehearsal", style="warn", justify="center"),
+        border="brand.amber", box_=box.DOUBLE, pad=(1, 4))))
     if not _preflight():
-        fail("Pre-flight failed. Fix the issue above, then run `make demo` again.")
+        return 1
+    show(deck_panel(Group(Text("READY", style="ok", justify="center"), Text(""),
+                          _share_reminders()),
+                    title="[ok]Pre-flight passed[/]", border="ok"), advance=False)
+    console.print(Align.center(Text("\nSingle entry point for the live run:  make demo\n",
+                                    style="muted")))
+    return 0
+
+
+def cmd_demo() -> int:
+    title_slide("Agentic payments, settled on Arbitrum One",
+                "live demo · press Enter to advance", [BLUE, PURPLE], "brand.blue")
+
+    show(deck_panel(
+        para("First, pre-flight. Run this BEFORE you share your screen. It "
+             "refreshes the payment session and makes one real $0.01 test payment "
+             "to prove the whole path. If anything is wrong, you find out now.",
+             justify="center"),
+        title="[warn]Step 1 · pre-flight[/]", border="brand.amber"))
+
+    console.clear()
+    console.print("\n")
+    console.print(Align.center(Rule("[brand.amber]Pre-flight[/]", style="brand.amber")))
+    if not _preflight():
+        show(deck_panel(para("Pre-flight failed. Fix the issue above, then run "
+                             "`make demo` again.", justify="center"),
+                        title="[err]Stop[/]", border="err"), advance=False)
         return 1
 
-    banner("✋ SHARE YOUR SCREEN NOW", "(pre-flight passed; the show begins next)", YELLOW)
-    _share_screen_reminders()
-    pause("screen shared and ready? Enter to begin SEGMENT 3 (provider)")
+    show(deck_panel(Group(Text("SHARE YOUR SCREEN NOW", style="warn", justify="center"),
+                          Text("pre-flight passed · the show begins next",
+                               style="muted", justify="center"),
+                          Text(""), _share_reminders()),
+                    border="brand.amber", box_=box.DOUBLE),
+         advance=False)
+    pause("screen shared and ready?  Enter to begin SEGMENT 3 (provider)")
 
     rc = cmd_provider()
     if rc:
         return rc
-
-    pause("Enter to begin SEGMENT 4 (the agent pays, live)")
+    pause("Enter to begin SEGMENT 4: the agent pays, live")
     rc = cmd_agent()
     if rc:
         return rc
 
-    banner("DEMO COMPLETE", "open the Arbiscan link; back to you + Q&A", CYAN)
-    return 0
-
-
-def cmd_preflight() -> int:
-    banner("PRE-FLIGHT (standalone) · dress rehearsal", color=YELLOW)
-    if not _preflight():
-        return 1
-    print()
-    _share_screen_reminders()
-    print(f"\n  Single entry point for the live run: {BOLD}make demo{RESET}\n")
+    show(deck_panel(
+        para("That was the whole loop: a 402 invoice, an autonomous payment, and "
+             "real settlement on Arbitrum One. Back to you for the wrap-up.",
+             justify="center"),
+        title="[brand.blue]Demo complete[/]", border="brand.blue"), advance=False)
     return 0
 
 
@@ -447,12 +539,12 @@ def main(argv: list[str] | None = None) -> int:
         args.remove("--auto")
     cmd = args[0] if args else ""
     if cmd not in COMMANDS:
-        print(f"Usage: demo.py [{' | '.join(COMMANDS)}] [--auto]")
+        console.print(f"Usage: demo.py [{' | '.join(COMMANDS)}] [--auto]")
         return 2
     try:
         return COMMANDS[cmd]()
     except KeyboardInterrupt:
-        print()
+        console.print()
         return 0
 
 
