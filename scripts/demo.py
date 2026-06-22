@@ -3,7 +3,7 @@
 This is the live "deck" for the provider and agent segments of the webinar.
 It runs the REAL flow (real 402, real on-chain USDC settlement) but renders it
 as a sequence of beautiful, slide-like screens with a branded palette,
-syntax-highlighted JSON, a gradient headline, and an Enter-to-advance rhythm.
+syntax-highlighted JSON, a bold wordmark, and an Enter-to-advance rhythm.
 
 Run via the make targets (which use apps/agent's uv environment):
 
@@ -125,23 +125,19 @@ def deck_panel(
     )
 
 
-def headline(token: str, colors: list[str]):
-    try:
-        from rich_pyfiglet import RichFiglet
-
-        return RichFiglet(token, font="slant", colors=colors, justify="center")
-    except Exception:  # noqa: BLE001
-        return Text(token, style=f"bold {colors[0]}", justify="center")
+def short(s: str, keep: int = 22) -> str:
+    """Truncate an identifier for on-screen display."""
+    return s if len(s) <= keep + 1 else s[:keep] + "…"
 
 
 def title_slide(subtitle: str, tagline: str, colors: list[str], border: str) -> None:
     group = Group(
-        headline("x402", colors),
-        Text(""),
+        Text("x402", style=f"bold {colors[0]}", justify="center"),
         Text(subtitle, style=f"bold {colors[-1]}", justify="center"),
+        Text(""),
         Text(tagline, style="muted", justify="center"),
     )
-    show(deck_panel(group, border=border, pad=(2, 6)))
+    show(deck_panel(group, border=border, pad=(3, 6)))
 
 
 def para(text: str, justify: str = "left") -> Text:
@@ -290,12 +286,14 @@ def cmd_provider() -> int:
     table.add_column("Field", style="key", no_wrap=True)
     table.add_column("Value", style="val")
     table.add_column("What it means", style="muted")
-    table.add_row("scheme", terms["scheme"], "pay this exact amount")
-    table.add_row("network", terms["network"], "Arbitrum One (CAIP-2)")
+    extra = terms.get("extra", {})
+    table.add_row("scheme", terms["scheme"], "'exact': pay this amount and asset")
+    table.add_row("network", terms["network"], "CAIP-2 id · eip155 = EVM, 42161 = Arbitrum One")
     table.add_row("price", terms["maxAmountRequired"], f"= ${amt:.2f} USDC (6 decimals)")
-    table.add_row("asset", terms["asset"], "native USDC on Arbitrum One")
+    table.add_row("asset", terms["asset"], "native USDC contract on Arbitrum One")
     table.add_row("payTo", terms["payTo"], "the merchant's payout address")
-    table.add_row("resource", terms["resource"], "what you are buying")
+    table.add_row("extra", f"{extra.get('name', '')} v{extra.get('version', '')}",
+                  "EIP-712 domain the agent's signature binds to")
     show(deck_panel(Align.center(table),
                     title="[brand.blue]The payment terms · a machine-readable invoice[/]"))
 
@@ -329,6 +327,26 @@ def cmd_agent() -> int:
              "spending budget. Watch it pay the 402 on its own.", justify="center"),
         title="[brand.purple]The autonomous buyer[/]", border="brand.purple"))
 
+    # Primer: EIP-3009 / EIP-712
+    show(deck_panel(
+        Group(
+            para("The agent does not send a transaction. It signs one. USDC "
+                 "implements EIP-3009 (transferWithAuthorization): the wallet "
+                 "signs a message authorizing a transfer of a set amount to a set "
+                 "address, valid until a deadline, with a one-time nonce."),
+            Text(""),
+            para("That message is EIP-712 typed data, bound to a domain (the "
+                 "asset's name and version from the 402, plus the USDC contract "
+                 "and chain id). The binding makes it replay-proof across apps "
+                 "and chains."),
+            Text(""),
+            para("Two consequences. The wallet needs no ETH for gas. And a third "
+                 "party (the CDP facilitator) submits the authorization on-chain "
+                 "and pays the gas. The signature is the payment."),
+        ),
+        title="[brand.purple]EIP-3009: pay by signature, not a transaction[/]",
+        border="brand.purple"))
+
     flow = Align.center(Text.from_markup(
         "[key]Agent[/key]  ──GET──▶  [warn]402[/]\n"
         "   │\n"
@@ -339,13 +357,19 @@ def cmd_agent() -> int:
         "[ok]USDC moves on Arbitrum One[/]  ──▶  [key]200 + gated JSON[/]",
         justify="left",
     ))
-    show(deck_panel(flow, title="[brand.purple]Pay and retry[/]", border="brand.purple"))
+    show(deck_panel(
+        Group(flow, Text(""),
+              para("The signed authorization is base64-encoded into the X-PAYMENT "
+                   "header on the retry. The facilitator's /verify checks the "
+                   "signature and balance off-chain (instant); /settle broadcasts "
+                   "the transferWithAuthorization on Arbitrum One.", justify="center")),
+        title="[brand.purple]Pay and retry[/]", border="brand.purple"))
 
     ids = Table(box=None, show_header=False, pad_edge=False)
     ids.add_column(style="key", no_wrap=True)
     ids.add_column(style="val")
-    ids.add_row("PaymentSession ", cfg.payment_session_id)
-    ids.add_row("Wallet instrument ", cfg.payment_instrument_id)
+    ids.add_row("PaymentSession ", short(cfg.payment_session_id))
+    ids.add_row("Wallet instrument ", short(cfg.payment_instrument_id))
     show(deck_panel(
         Group(Align.center(ids), Text(""),
               para("Budgeted and time-limited. When you press Enter, the agent "
@@ -372,7 +396,8 @@ def cmd_agent() -> int:
         return 1
 
     if resp.status_code == 200:
-        show(Align.center(headline("PAID", [GREEN, BLUE])), top=2)
+        show(deck_panel(Text("PAID  ✓", style="ok", justify="center"),
+                        border="ok", box_=box.DOUBLE, pad=(2, 6)))
     else:
         show(deck_panel(Text(str(resp.status_code), style="err", justify="center"),
                         title="[err]Unexpected status[/]", border="err"), advance=False)
