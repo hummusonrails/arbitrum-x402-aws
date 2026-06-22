@@ -31,3 +31,6 @@ packages/*/dist/
 
 # Local plan/spec scratchpad (never committed)
 docs/superpowers/
+
+# Internal notes, support tickets, debug scratch (never committed)
+internal/
