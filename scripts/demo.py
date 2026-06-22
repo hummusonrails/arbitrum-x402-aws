@@ -231,17 +231,27 @@ def cmd_provider() -> int:
     title_slide("The Provider Side", "How a server asks an agent to pay",
                 [BLUE, PURPLE], "brand.blue")
 
-    # Concept
-    body = Group(
-        para("HTTP has always had a status code reserved for this moment: "
-             "402 Payment Required. For 30 years it sat unused. x402 gives it a job."),
-        Text(""),
+    # Hook: the problem
+    show(deck_panel(
+        para("APIs today gate access with API keys and monthly bills. But how "
+             "does an AI agent, with no account and no credit card, pay for a "
+             "single API call? That is the problem x402 solves.", justify="center"),
+        title="[brand.blue]The problem[/]", border="brand.blue"))
+
+    # The 402 idea
+    show(deck_panel(
+        para("HTTP has always had a status code reserved for exactly this: "
+             "402 Payment Required. For 30 years it sat unused. x402 finally "
+             "gives it a job.", justify="center"),
+        title="[brand.blue]402 Payment Required[/]", border="brand.blue"))
+
+    # Our merchant
+    show(deck_panel(
         para("Our merchant is a normal-looking API on AWS. A request with no "
-             "payment does not get the data. It gets a 402 and a machine-readable "
-             "invoice telling the caller exactly how to pay."),
-    )
-    show(deck_panel(body, title="[brand.purple]402 Payment Required[/]",
-                    border="brand.purple"))
+             "payment does not get the data. It gets back a 402 and a "
+             "machine-readable invoice telling the caller exactly how to pay.",
+             justify="center"),
+        title="[brand.blue]A normal API, with a price[/]", border="brand.blue"))
 
     # Architecture
     diagram = Align.center(Text.from_markup(
@@ -321,40 +331,99 @@ def cmd_agent() -> int:
     title_slide("The Agent Side", "Pay the 402 and settle on Arbitrum One",
                 [PURPLE, GREEN], "brand.purple")
 
+    # Who the buyer is
     show(deck_panel(
-        para("The buyer is an agent running on AWS Bedrock AgentCore. AgentCore "
-             "gives it an embedded crypto wallet, backed by Coinbase CDP, and a "
-             "spending budget. Watch it pay the 402 on its own.", justify="center"),
+        para("The buyer is an AI agent running on AWS Bedrock AgentCore. "
+             "AgentCore gives it an embedded crypto wallet (backed by Coinbase "
+             "CDP) and a spending budget, then lets it pay on its own.",
+             justify="center"),
         title="[brand.purple]The autonomous buyer[/]", border="brand.purple"))
 
-    # Primer: EIP-3009 / EIP-712
+    # The question
+    show(deck_panel(
+        para("One question to answer first: how does a piece of software pay "
+             "money on a blockchain, with no human clicking a checkout button?",
+             justify="center"),
+        title="[brand.purple]How does software pay?[/]", border="brand.purple"))
+
+    # The normal way: transaction + gas
     show(deck_panel(
         Group(
-            para("The agent does not send a transaction. It signs one. USDC "
-                 "implements EIP-3009 (transferWithAuthorization): the wallet "
-                 "signs a message authorizing a transfer of a set amount to a set "
-                 "address, valid until a deadline, with a one-time nonce."),
+            para("The usual way to move funds on a blockchain is to send a "
+                 "transaction: an instruction to the network to move money from "
+                 "one address to another."),
             Text(""),
-            para("That message is EIP-712 typed data, bound to a domain (the "
-                 "asset's name and version from the 402, plus the USDC contract "
-                 "and chain id). The binding makes it replay-proof across apps "
-                 "and chains."),
-            Text(""),
-            para("Two consequences. The wallet needs no ETH for gas. And a third "
-                 "party (the CDP facilitator) submits the authorization on-chain "
-                 "and pays the gas. The signature is the payment."),
+            para("Every transaction costs a small network fee, called gas, paid "
+                 "in the chain's native coin (on Ethereum and Arbitrum, that is "
+                 "ETH). So to spend dollars, the sender also has to hold ETH."),
         ),
-        title="[brand.purple]EIP-3009: pay by signature, not a transaction[/]",
+        title="[brand.purple]The normal way: a transaction + gas[/]",
         border="brand.purple"))
+
+    # The friction
+    show(deck_panel(
+        para("For an agent making a $0.01 purchase, that is a lot of baggage: "
+             "hold ETH, estimate gas, sign and broadcast a transaction, wait for "
+             "it to confirm. We want something lighter.", justify="center"),
+        title="[brand.purple]Too much for one cent[/]", border="brand.purple"))
+
+    # Sign, don't send
+    show(deck_panel(
+        Group(
+            para("x402's move: sign, do not send. Instead of broadcasting a "
+                 "transaction, the agent's wallet cryptographically signs an "
+                 "authorization."),
+            Text(""),
+            para("Think of a signed, tamper-proof check that says: pay $0.01 to "
+                 "this address, once, before this deadline. It is just a signed "
+                 "message. Nothing has touched the blockchain yet."),
+        ),
+        title="[brand.purple]x402: sign, don't send[/]", border="brand.purple"))
+
+    # The facilitator does the on-chain part
+    show(deck_panel(
+        Group(
+            para("So who actually puts it on the blockchain? A service called the "
+                 "facilitator. It takes the signed authorization, verifies it, "
+                 "and submits it to the chain, paying the gas itself."),
+            Text(""),
+            para("The payoff: the agent's wallet never needs ETH. The signature "
+                 "is the payment, and it settles in seconds for a fraction of a "
+                 "cent."),
+        ),
+        title="[brand.purple]The facilitator does the on-chain part[/]",
+        border="brand.purple"))
+
+    # Why it's safe
+    show(deck_panel(
+        para("Two things keep it safe. The authorization can be used only once: "
+             "it carries a one-time number, so the same signature cannot be "
+             "replayed. And it is cryptographically tied to this exact token and "
+             "network, so it cannot be reused anywhere else.", justify="center"),
+        title="[brand.purple]Why it is safe[/]", border="brand.purple"))
+
+    # Keywords for the blockchain-curious
+    show(deck_panel(
+        Group(
+            para("For the blockchain-curious, the building blocks are open "
+                 "standards:", justify="center"),
+            Text(""),
+            Text("USDC's transferWithAuthorization  (EIP-3009)", style="val",
+                 justify="center"),
+            Text("signed as EIP-712 typed data", style="val", justify="center"),
+            Text("a one-time nonce  ·  a validity deadline", style="val",
+                 justify="center"),
+        ),
+        title="[brand.purple]Under the hood[/]", border="brand.purple"))
 
     flow = Align.center(Text.from_markup(
         "[key]Agent[/key]  ──GET──▶  [warn]402[/]\n"
         "   │\n"
-        "   ▼  AgentCore signs [key]EIP-3009[/]  [muted](gasless USDC authorization)[/]\n"
+        "   ▼  wallet signs the payment  [muted](no transaction, no gas)[/]\n"
         "[key]X-PAYMENT[/]  ──retry──▶  [brand.amber]Lambda@Edge[/]\n"
         "   │\n"
-        "   ▼  [brand.cdp]CDP facilitator[/]: verify + settle\n"
-        "[ok]USDC moves on Arbitrum One[/]  ──▶  [key]200 + gated JSON[/]",
+        "   ▼  [brand.cdp]facilitator[/]: check, then submit to the blockchain\n"
+        "[ok]USDC moves on Arbitrum One[/]  ──▶  [key]200 + the data[/]",
         justify="left",
     ))
     show(deck_panel(
