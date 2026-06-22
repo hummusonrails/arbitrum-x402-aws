@@ -21,6 +21,10 @@
   <strong>End-to-end x402 payments on Arbitrum One. AWS CloudFront + Lambda@Edge merchant, paid by an AWS Bedrock AgentCore Python agent. USDC settles on Arbitrum One via Coinbase CDP.</strong>
 </p>
 
+<p align="center">
+  <strong>New to CDP or AWS AgentCore?</strong> The <a href="docs/getting-started/README.md">zero-knowledge Getting Started guide</a> walks you from no accounts to a paid request, click by click.
+</p>
+
 ## What's in this repo
 
 | App | Path | Language | Role |
@@ -94,7 +98,7 @@ sequenceDiagram
 <!-- Featured -->
 <p align="center">
   <a href="https://x.com/hummusonrails/status/2049363842283544939">
-    <img src=".github/x402-on-arbitrum-meets-aws.jpg" alt="x402 on Arbitrum meets AWS — read the article on X" width="640">
+    <img src=".github/x402-on-arbitrum-meets-aws.jpg" alt="x402 on Arbitrum meets AWS, read the article on X" width="640">
   </a>
 </p>
 <p align="center">
@@ -102,6 +106,8 @@ sequenceDiagram
 </p>
 
 ## Quick Start
+
+> This Quick Start assumes you already have CDP and AWS accounts, credentials, and tooling set up. If you don't, follow the [**Getting Started guide**](docs/getting-started/README.md) instead, it covers account creation, credentials, IAM, and every `.env` value with screenshots.
 
 ```bash
 # 1. Install both stacks
