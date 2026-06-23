@@ -9,6 +9,8 @@ import { AwsArchitecture } from "./AwsArchitecture";
 import { AdoptionStats } from "./AdoptionStats";
 import { Ecosystem } from "./Ecosystem";
 import { WhyArbitrum } from "./WhyArbitrum";
+import { WhyArbitrumLiquidity } from "./WhyArbitrumLiquidity";
+import { WhyArbitrumInstitutions } from "./WhyArbitrumInstitutions";
 import { LiveProvider } from "./LiveProvider";
 import { LiveAgent } from "./LiveAgent";
 import { Takeaways } from "./Takeaways";
@@ -24,6 +26,8 @@ export const SCREENS: Record<string, ComponentType> = {
   "adoption-stats": AdoptionStats,
   ecosystem: Ecosystem,
   "why-arbitrum": WhyArbitrum,
+  "why-arbitrum-liquidity": WhyArbitrumLiquidity,
+  "why-arbitrum-institutions": WhyArbitrumInstitutions,
   "live-provider": LiveProvider,
   "live-agent": LiveAgent,
   takeaways: Takeaways,

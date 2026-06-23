@@ -7,7 +7,9 @@
   { "id": "aws-architecture", "title": "The full loop, on AWS", "kind": "context" },
   { "id": "adoption-stats", "title": "x402 adoption today", "kind": "context" },
   { "id": "ecosystem", "title": "The agent-payment standards landscape", "kind": "context" },
-  { "id": "why-arbitrum", "title": "Why Arbitrum: settlement economics", "kind": "context" },
+  { "id": "why-arbitrum", "title": "Why Arbitrum: cheap, predictable fees", "kind": "context" },
+  { "id": "why-arbitrum-liquidity", "title": "Why Arbitrum: deepest stablecoin liquidity", "kind": "context" },
+  { "id": "why-arbitrum-institutions", "title": "Why Arbitrum: high-quality assets + TradFi/DeFi", "kind": "context" },
   { "id": "live-provider", "title": "Live: the provider side", "kind": "live" },
   { "id": "live-agent", "title": "Live: the agent side", "kind": "live" },
   { "id": "takeaways", "title": "Takeaways", "kind": "context" }

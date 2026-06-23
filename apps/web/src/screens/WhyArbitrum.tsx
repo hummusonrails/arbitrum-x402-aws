@@ -1,18 +1,9 @@
-import { Slide, Eyebrow, Title, Lead, Bars, Stat, Panel } from "@/components/ui";
+import { Slide, Eyebrow, Title, Lead, Stat } from "@/components/ui";
 
 export function WhyArbitrum() {
-  const stylus = [
-    {
-      label: "Solidity",
-      value: 1_027_635,
-      display: "1,027,635 gas",
-      color: "#9DCCED",
-    },
-    { label: "Stylus", value: 76_048, display: "76,048 gas" },
-  ];
   return (
     <Slide>
-      <Eyebrow>Settlement economics</Eyebrow>
+      <Eyebrow>Why Arbitrum · settlement economics</Eyebrow>
       <Title>
         Sub-cent payments need{" "}
         <span className="text-blue">cheap, predictable fees.</span>
@@ -22,24 +13,21 @@ export function WhyArbitrum() {
         micro-payments viable &mdash; and cheap compute lets you verify, not just
         settle.
       </Lead>
-      <div className="grid grid-cols-2 gap-8 mt-10 items-center">
-        <Panel>
-          <Stat
-            value="98%"
-            label="gas reduction at peak demand"
-            sub="ArbOS Dia upgrade vs the old single-target pricing model"
-          />
-        </Panel>
-        <div>
-          <div className="text-white font-semibold mb-4">
-            Same scoring algorithm,{" "}
-            <span className="text-blue">92.6% cheaper</span> on Stylus
-          </div>
-          <Bars data={stylus} />
-          <div className="text-lightblue/60 text-sm mt-3">
-            Rust &rarr; WASM. Loop-heavy math executes at near-native speed.
-          </div>
-        </div>
+      <div className="mt-6 flex justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/gas-predictability.png"
+          alt="Gas price on Arbitrum One stays flat and predictable through demand spikes"
+          className="rounded-xl max-h-[44vh] w-auto"
+        />
+      </div>
+      <div className="flex items-center justify-around mt-6">
+        <Stat value="98%" label="gas reduction at peak" sub="ArbOS Dia upgrade" />
+        <Stat
+          value="92.6%"
+          label="cheaper compute on Stylus"
+          sub="same algorithm, vs Solidity"
+        />
       </div>
     </Slide>
   );
