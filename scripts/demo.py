@@ -221,6 +221,46 @@ def json_panel(obj, title: str, border: str = "brand.blue") -> Panel:
     return deck_panel(code, title=title, border=border, pad=(1, 3))
 
 
+SCREENSHOTS = REPO_ROOT / "docs" / "getting-started" / "images"
+
+
+def code_slide(rel_path: str, lexer: str, a: int, b: int, *, title: str,
+               callout: str, highlight=None, border: str = "brand.blue") -> None:
+    """Read a real source file at runtime and present lines a..b (1-based).
+
+    Line numbers are the actual file line numbers; `highlight` is a set of those
+    same numbers to emphasize.
+    """
+    src = (REPO_ROOT / rel_path).read_text().splitlines()
+    snippet = "\n".join(src[a - 1:b])
+    syn = Syntax(
+        snippet, lexer, theme="monokai", line_numbers=True, start_line=a,
+        word_wrap=True, padding=(1, 2), background_color="default",
+        highlight_lines=set(highlight or []),
+    )
+    group = Group(
+        syn, Text(""),
+        para(callout, justify="center"), Text(""),
+        Text(f"{rel_path}  ·  lines {a}-{b}", style="muted", justify="center"),
+    )
+    show(deck_panel(group, title=title, border=border, pad=(1, 3)))
+
+
+def open_image(name: str) -> None:
+    """Open a docs screenshot in the macOS previewer (skipped in --auto)."""
+    if _AUTO:
+        return
+    path = SCREENSHOTS / name
+    if not path.exists() or sys.platform != "darwin":
+        return
+    try:
+        import subprocess
+
+        subprocess.run(["open", str(path)], check=False)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # ----------------------------------------------------------------------------
 # Segment 3: provider side
 # ----------------------------------------------------------------------------
@@ -272,6 +312,15 @@ def cmd_provider() -> int:
                    justify="center")),
         title="[brand.amber]At the edge[/]", border="brand.amber"))
 
+    # Real code: the edge handler's no-payment path
+    code_slide(
+        "apps/merchant/lib/edge-function/index.ts", "typescript", 70, 80,
+        title="[brand.amber]The edge function: no payment, no data[/]",
+        highlight={74, 79}, border="brand.amber",
+        callout="A request with no X-PAYMENT header gets the 402 invoice "
+                "immediately (line 79), built at the edge (line 74), before the "
+                "origin is ever called.")
+
     # Live: hit the endpoint
     console.clear()
     console.print("\n")
@@ -307,6 +356,14 @@ def cmd_provider() -> int:
     show(deck_panel(Align.center(table),
                     title="[brand.blue]The payment terms · a machine-readable invoice[/]"))
 
+    # Real code: where that invoice comes from
+    code_slide(
+        "apps/merchant/lib/edge-function/build-requirements.ts", "typescript", 3, 16,
+        title="[brand.blue]Where the invoice comes from[/]",
+        highlight={5, 6, 7, 11, 13},
+        callout="The exact fields you just saw, assembled from config: the scheme, "
+                "the network, the price, the asset, and who gets paid.")
+
     # Raw response
     show(json_panel(body, "[brand.blue]The actual 402 response body[/]"))
 
@@ -328,6 +385,9 @@ def cmd_provider() -> int:
 
 def cmd_agent() -> int:
     cfg = load_run_config()
+    payment_manager = PaymentManager(
+        payment_manager_arn=cfg.payment_manager_arn, region_name=cfg.region
+    )
     title_slide("The Agent Side", "Pay the 402 and settle on Arbitrum One",
                 [PURPLE, GREEN], "brand.purple")
 
@@ -434,6 +494,24 @@ def cmd_agent() -> int:
                    "the transferWithAuthorization on Arbitrum One.", justify="center")),
         title="[brand.purple]Pay and retry[/]", border="brand.purple"))
 
+    # Real code: the agent's pay-and-retry
+    code_slide(
+        "apps/agent/src/x402_aws_agent/http_client.py", "python", 64, 91,
+        title="[brand.purple]The agent's pay-and-retry, in one function[/]",
+        highlight={78, 87}, border="brand.purple",
+        callout="GET the resource; on a 402, ask AgentCore to sign a payment "
+                "header (line 78), then retry the same request with that header "
+                "attached (line 87).")
+
+    # Real code: what the merchant does with the proof
+    code_slide(
+        "apps/merchant/lib/edge-function/facilitator.ts", "typescript", 50, 74,
+        title="[brand.purple]What the merchant does with the proof[/]",
+        highlight={56, 69}, border="brand.purple",
+        callout="The edge function hands the signed payment to the CDP "
+                "facilitator: /verify checks it off-chain (line 56), /settle "
+                "submits it on Arbitrum One (line 69).")
+
     ids = Table(box=None, show_header=False, pad_edge=False)
     ids.add_column(style="key", no_wrap=True)
     ids.add_column(style="val")
@@ -472,21 +550,93 @@ def cmd_agent() -> int:
                         title="[err]Unexpected status[/]", border="err"), advance=False)
         return 1
 
-    # The gated data
-    show(json_panel(resp.json_body, "[ok]The gated data · paid for, on-chain[/]",
-                    border="ok"))
+    # The real 200 response (a small stub from the demo origin)
+    show(json_panel(resp.json_body, "[ok]The real 200 response[/]", border="ok"))
 
-    tx = resp.json_body.get("txHash") or resp.json_body.get("tx_hash")
-    if tx:
-        link = Text(f"https://arbiscan.io/tx/{tx}", style=f"bold {BLUE}", justify="center")
+    # A realistic, representative unlocked payload (built from the real values)
+    real = resp.json_body
+    p = real.get("payload", {})
+    unlocked = {
+        "resource": real.get("resource", "premium-market-data"),
+        "asOf": real.get("asOf"),
+        "requestId": real.get("requestId"),
+        "payment": {
+            "protocol": "x402",
+            "network": "arbitrum-one",
+            "amountUsd": 0.01,
+            "settled": True,
+        },
+        "markets": [
+            {"symbol": "BTC", "priceUsd": p.get("btc", 71234.56),
+             "change24hPct": 1.02, "volumeUsd": 42330194883},
+            {"symbol": "ETH", "priceUsd": p.get("eth", 4567.89),
+             "change24hPct": 2.14, "volumeUsd": 18920334512},
+            {"symbol": "ARB", "priceUsd": 1.27,
+             "change24hPct": -0.83, "volumeUsd": 412903882},
+        ],
+        "access": "pay-per-call · no subscription, no API key",
+    }
+    syn = Syntax(json.dumps(unlocked, indent=2), "json", theme="monokai",
+                 word_wrap=True, padding=(1, 3), background_color="default")
+    show(deck_panel(
+        Group(syn, Text(""),
+              para("The demo origin returns a tiny stub. In production, this is "
+                   "where your gated content lives. The agent now holds it, having "
+                   "paid one cent, with no account and no API key.",
+                   justify="center")),
+        title="[ok]What you just unlocked (representative payload)[/]", border="ok"))
+
+    # Verify on-chain via the wallet's Arbiscan page (always available)
+    addr = wallet_address(payment_manager, cfg)
+    if addr:
+        link = Text(f"https://arbiscan.io/address/{addr}", style=f"bold {BLUE}",
+                    justify="center")
         show(deck_panel(
             Group(Text("Settled on Arbitrum One", style="ok", justify="center"),
                   Text(""), link, Text(""),
-                  para("A real, public, on-chain USDC transfer from the agent's "
-                       "wallet to the merchant. An autonomous agent just bought "
-                       "data and paid for it, in seconds, for a fraction of a cent.",
+                  para("The most recent USDC transfer on the agent's wallet is the "
+                       "payment you just made. Public, on-chain, final in seconds, "
+                       "for a fraction of a cent.", justify="center")),
+            title="[ok]Verify it on-chain[/]", border="ok"), advance=False)
+    return 0
+
+
+# ----------------------------------------------------------------------------
+# Optional: one-time setup recap (uses the real docs screenshots)
+# ----------------------------------------------------------------------------
+
+
+def cmd_setup() -> int:
+    """Walk the one-time CDP + AWS setup, opening the real docs screenshots."""
+    title_slide("Before the agent can pay",
+                "the one-time setup, on CDP and AWS", [AMBER, BLUE], "brand.amber")
+
+    steps = [
+        ("01-cdp-create-api-key.png", "Coinbase Developer Platform: API key",
+         "On CDP you create a Secret API key. The merchant uses it to "
+         "authenticate to the CDP facilitator when it verifies and settles "
+         "payments. It is a one-time setup, done in the CDP portal."),
+        ("01-cdp-delegated-signing.png", "CDP: delegated signing",
+         "You enable delegated signing on the embedded wallet. This is what "
+         "lets AgentCore sign payments on the agent's behalf, within a budget "
+         "you set, without exposing a private key."),
+        ("03-iam-role-summary.png", "AWS: one IAM role",
+         "On AWS you create a single IAM role that AgentCore Payments assumes "
+         "at runtime to fetch the credentials and manage the wallet. The full "
+         "trust policy is in the getting-started guide."),
+    ]
+    for img, t, callout in steps:
+        open_image(img)
+        show(deck_panel(
+            Group(para(callout, justify="center"), Text(""),
+                  Text(f"docs/getting-started/images/{img}", style="muted",
                        justify="center")),
-            title="[ok]Settlement[/]", border="ok"), advance=False)
+            title=f"[brand.amber]{t}[/]", border="brand.amber"))
+
+    show(deck_panel(
+        para("That is the entire setup. From here, the merchant is live and the "
+             "agent has a funded, budgeted wallet. Now the demo.", justify="center"),
+        title="[brand.amber]Setup done[/]", border="brand.amber"), advance=False)
     return 0
 
 
@@ -620,6 +770,7 @@ def cmd_demo() -> int:
 COMMANDS = {
     "demo": cmd_demo,
     "preflight": cmd_preflight,
+    "setup": cmd_setup,
     "provider": cmd_provider,
     "agent": cmd_agent,
 }

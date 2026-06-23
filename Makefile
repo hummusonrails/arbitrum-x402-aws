@@ -1,4 +1,4 @@
-.PHONY: help install test build synth deploy-merchant destroy-merchant setup-agent run-agent teardown-agent clean demo demo-preflight demo-provider demo-agent
+.PHONY: help install test build synth deploy-merchant destroy-merchant setup-agent run-agent teardown-agent clean demo demo-preflight demo-setup demo-provider demo-agent
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  clean             Remove node_modules, .venv, build artifacts"
 	@echo "  demo              LIVE DEMO entry point: pre-flight then segments 3 + 4"
 	@echo "  demo-preflight    (escape hatch) prep only: refresh session + smoke-test"
+	@echo "  demo-setup        (escape hatch) one-time CDP + AWS setup recap (screenshots)"
 	@echo "  demo-provider     (escape hatch) segment 3 only: the 402 / payment terms"
 	@echo "  demo-agent        (escape hatch) segment 4 only: pay + settle"
 
@@ -51,6 +52,9 @@ demo:
 
 demo-preflight:
 	cd apps/agent && uv run python ../../scripts/demo.py preflight
+
+demo-setup:
+	cd apps/agent && uv run python ../../scripts/demo.py setup
 
 demo-provider:
 	cd apps/agent && uv run python ../../scripts/demo.py provider
