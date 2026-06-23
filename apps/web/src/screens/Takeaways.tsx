@@ -2,7 +2,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Slide, Eyebrow, Title, Panel } from "@/components/ui";
 
 const REPO_QR =
-  "github.com/hummusonrails/arbitrum-x402-aws?utm_source=linkedin-webinar&utm_medium=event&utm_campaign=arbitrum-x-aws-collaboration";
+  "https://github.com/hummusonrails/arbitrum-x402-aws?utm_source=linkedin-webinar&utm_medium=event&utm_campaign=arbitrum-x-aws-collaboration";
 
 export function Takeaways() {
   const cols = [
