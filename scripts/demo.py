@@ -20,17 +20,14 @@ Only public data (merchant URL, wallet address, recipient, tx hash, ids).
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
 import subprocess
 import sys
 import uuid
-import warnings
 from pathlib import Path
-
-# term-image warns when stdout is not a tty (e.g. rehearsal with --auto piped).
-warnings.filterwarnings("ignore", message=".*not running within a terminal.*")
 
 import httpx
 from dotenv import load_dotenv
@@ -252,45 +249,58 @@ def code_slide(rel_path: str, lexer: str, a: int, b: int, *, title: str,
     show(deck_panel(group, title=title, border=border, pad=(1, 3)))
 
 
-def _render_inline(path: Path) -> bool:
-    """Render a PNG inline using the terminal's graphics protocol. True on success.
+def _kitty_capable() -> bool:
+    """Terminals that implement the kitty graphics protocol."""
+    term = os.environ.get("TERM", "")
+    return (
+        "kitty" in term
+        or "ghostty" in term
+        or os.environ.get("TERM_PROGRAM", "") == "WezTerm"
+    )
 
-    Ghostty / kitty use the Kitty graphics protocol; iTerm2 / WezTerm use the
-    iTerm2 inline protocol; term-image auto-detects otherwise. Any failure
-    returns False so the caller can fall back.
+
+def _kitty_draw(path: Path, rows: int) -> None:
+    """Transmit + display a PNG inline via the kitty graphics protocol.
+
+    `f=100` sends the PNG bytes (the terminal decodes them at full resolution);
+    `r=rows` fixes the height in cells and the width is derived from the image's
+    aspect ratio, so the render is pixel-sharp and exactly `rows` tall. The
+    payload is base64-chunked at 4096 bytes per the spec.
     """
-    try:
-        from term_image.image import from_file
-    except Exception:  # noqa: BLE001
-        return False
-    try:
-        # from_file auto-selects the best style the active terminal supports
-        # (Kitty on Ghostty/kitty, iTerm2 on iTerm2/WezTerm, blocks otherwise).
-        img = from_file(str(path))
-        # Size by height so the image fits the viewport with room for the
-        # caption below; cap the width if the result would overflow.
-        max_h = max(10, min(console.size.height - 16, 22))
-        max_w = max(20, console.size.width - 6)
-        img.set_size(height=max_h)
-        if img.rendered_width > max_w:
-            img.set_size(width=max_w)
-        img.draw(h_align="center", pad_width=console.size.width, check_size=False)
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+    data = base64.standard_b64encode(path.read_bytes())
+    out = sys.stdout.buffer
+    chunk, n, i, first = 4096, len(data), 0, True
+    while i < n:
+        part = data[i:i + chunk]
+        i += chunk
+        more = 0 if i >= n else 1
+        header = f"a=T,f=100,r={rows},q=2,m={more}" if first else f"m={more}"
+        out.write(b"\x1b_G" + header.encode("ascii") + b";" + part + b"\x1b\\")
+        first = False
+    out.flush()
 
 
-def show_screenshot(name: str, width: int) -> None:
-    """Show a docs screenshot inline; fall back to chafa, then Preview."""
+def show_screenshot(name: str) -> None:
+    """Show a docs screenshot inline (sized to fit), then chafa, then Preview."""
     if _AUTO:
         return
     path = SCREENSHOTS / name
     if not path.exists():
         return
-    if sys.stdout.isatty() and _render_inline(path):
-        return
+    rows = max(8, min(console.size.height - 14, 20))
+    if sys.stdout.isatty() and _kitty_capable():
+        try:
+            _kitty_draw(path, rows)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            return
+        except Exception:  # noqa: BLE001
+            pass
     if shutil.which("chafa"):
-        subprocess.run(["chafa", f"--size={width}x", str(path)], check=False)
+        subprocess.run(
+            ["chafa", f"--size={console.size.width - 6}x{rows}", str(path)],
+            check=False,
+        )
         return
     if sys.platform == "darwin":
         subprocess.run(["open", str(path)], check=False)
@@ -665,7 +675,7 @@ def cmd_setup() -> int:
         console.print()
         console.rule(f"[brand.amber]{t}[/]", style="brand.amber")
         console.print()
-        show_screenshot(img, width=min(console.size.width - 8, 100))
+        show_screenshot(img)
         console.print()
         console.print(Align.center(deck_panel(
             para(callout, justify="center"), border="brand.amber", pad=(1, 2))))
