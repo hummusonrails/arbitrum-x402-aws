@@ -776,8 +776,7 @@ def cmd_context() -> int:
                 Text(""),
                 Text(s["title"], style="bold white", justify="center"),
                 Text(""),
-                para("Showing on the companion screen in your browser. Narrate it, "
-                     "then press Enter for the next one.", justify="center"),
+                Text("Enter to continue", style="muted", justify="center"),
             ),
             title="[brand.blue]Context[/]", border="brand.blue"))
     return 0
