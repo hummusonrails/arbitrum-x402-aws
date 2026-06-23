@@ -20,7 +20,6 @@ Only public data (merchant URL, wallet address, recipient, tx hash, ids).
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import shutil
@@ -100,7 +99,6 @@ def pause(msg: str = "press Enter to continue  ▸") -> None:
 def show(renderable, *, top: int = 1, advance: bool = True) -> None:
     """Clear the screen and present one centered renderable as a slide."""
     console.clear()
-    _kitty_clear()
     console.print("\n" * top, end="")
     console.print(Align.center(renderable))
     if advance:
@@ -250,98 +248,28 @@ def code_slide(rel_path: str, lexer: str, a: int, b: int, *, title: str,
     show(deck_panel(group, title=title, border=border, pad=(1, 3)))
 
 
-def _kitty_capable() -> bool:
-    """Terminals that implement the kitty graphics protocol."""
-    term = os.environ.get("TERM", "")
-    return (
-        "kitty" in term
-        or "ghostty" in term
-        or os.environ.get("TERM_PROGRAM", "") == "WezTerm"
-    )
+def show_screenshot(name: str) -> bool:
+    """Show a docs screenshot. Returns True if rendered inline, False if opened
+    in an external viewer.
 
-
-def _kitty_clear() -> None:
-    """Delete all kitty graphics placements.
-
-    Clearing the text grid (console.clear / CSI 2J) does NOT remove kitty
-    images; they persist and ghost onto the next slide. This issues the
-    protocol's delete-all so every slide starts with no leftover image.
-    """
-    if sys.stdout.isatty() and _kitty_capable():
-        sys.stdout.write("\x1b_Ga=d,d=A\x1b\\")
-        sys.stdout.flush()
-
-
-def _kitty_draw(path: Path, rows: int) -> None:
-    """Transmit + display a PNG inline via the kitty graphics protocol.
-
-    `f=100` sends the PNG bytes (the terminal decodes them at full resolution);
-    `r=rows` fixes the height in cells and the width is derived from the image's
-    aspect ratio, so the render is pixel-sharp and exactly `rows` tall. The
-    payload is base64-chunked at 4096 bytes per the spec.
-    """
-    data = base64.standard_b64encode(path.read_bytes())
-    out = sys.stdout.buffer
-    chunk, n, i, first = 4096, len(data), 0, True
-    while i < n:
-        part = data[i:i + chunk]
-        i += chunk
-        more = 0 if i >= n else 1
-        header = f"a=T,f=100,r={rows},q=2,m={more}" if first else f"m={more}"
-        out.write(b"\x1b_G" + header.encode("ascii") + b";" + part + b"\x1b\\")
-        first = False
-    out.flush()
-
-
-def _png_size(path: Path) -> tuple[int, int]:
-    """Read a PNG's pixel (width, height) from its IHDR header. No dependency."""
-    b = path.read_bytes()[:24]
-    return int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big")
-
-
-# Approximate terminal cell height:width ratio (cells are ~twice as tall as wide).
-_CELL_RATIO = 2.1
-
-
-def show_screenshot(name: str, reserve_rows: int = 9) -> None:
-    """Show a docs screenshot inline, as large as the viewport allows.
-
-    Sized to fill the screen (leaving `reserve_rows` for the title, caption and
-    prompt) so the screenshot is upscaled rather than shrunk and stays legible.
-    Falls back to chafa, then Preview, on terminals without kitty graphics.
+    Reliable inline image rendering is terminal-specific and fiddly; chafa is
+    the proven tool that correctly auto-detects the terminal's graphics protocol
+    (kitty on Ghostty). If chafa is installed we render inline; otherwise we open
+    the image in the macOS previewer.
     """
     if _AUTO:
-        return
+        return True
     path = SCREENSHOTS / name
     if not path.exists():
-        return
-
-    w_px, h_px = _png_size(path)
-    avail_rows = max(10, console.size.height - reserve_rows)
-    avail_cols = max(20, console.size.width - 4)
-    aspect = (w_px / h_px) * _CELL_RATIO  # cols-per-row for this image
-    rows = avail_rows
-    if rows * aspect > avail_cols:        # would overflow width -> bind on width
-        rows = max(10, int(avail_cols / aspect))
-    pad = max(0, (avail_cols - int(rows * aspect)) // 2)
-
-    if sys.stdout.isatty() and _kitty_capable():
-        try:
-            if pad:
-                sys.stdout.write(f"\x1b[{pad}C")
-            _kitty_draw(path, rows)
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-            return
-        except Exception:  # noqa: BLE001
-            pass
-    if shutil.which("chafa"):
-        subprocess.run(
-            ["chafa", f"--size={avail_cols}x{rows}", str(path)], check=False
-        )
-        return
+        return True
+    if sys.stdout.isatty() and shutil.which("chafa"):
+        rows = max(10, min(console.size.height - 9, 28))
+        cols = max(20, console.size.width - 4)
+        subprocess.run(["chafa", f"--size={cols}x{rows}", str(path)], check=False)
+        return True
     if sys.platform == "darwin":
         subprocess.run(["open", str(path)], check=False)
+    return False
 
 
 # ----------------------------------------------------------------------------
@@ -709,12 +637,14 @@ def cmd_setup() -> int:
     ]
     for img, t, callout in steps:
         console.clear()
-        _kitty_clear()
         console.rule(f"[brand.amber]{t}[/]", style="brand.amber")
         console.print()
         console.print(Text(callout, style="muted", justify="center"))
         console.print()
-        show_screenshot(img)
+        inline = show_screenshot(img)
+        if not inline:
+            console.print(Text(f"(opened {img} in Preview)", style="muted",
+                               justify="center"))
         pause()
 
     show(deck_panel(
