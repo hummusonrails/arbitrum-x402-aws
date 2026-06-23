@@ -1,4 +1,4 @@
-.PHONY: help install test build synth deploy-merchant destroy-merchant setup-agent run-agent teardown-agent clean demo demo-web demo-cli demo-preflight demo-provider demo-agent
+.PHONY: help install test build synth deploy-merchant destroy-merchant setup-agent run-agent teardown-agent clean demo demo-web demo-cli demo-preflight demo-provider demo-agent present
 
 help:
 	@echo "Targets:"
@@ -12,6 +12,7 @@ help:
 	@echo "  run-agent         Run the agent against the merchant"
 	@echo "  teardown-agent    Delete AgentCore resources"
 	@echo "  clean             Remove node_modules, .venv, build artifacts"
+	@echo "  present           Toggle Ghostty presentation mode (big font + high contrast); run again to restore"
 	@echo "  demo              ONE-COMMAND LIVE DEMO: starts the web companion + opens it + runs the driver"
 	@echo "  demo-web          Start only the web companion (granular use)"
 	@echo "  demo-cli          Run only the CLI driver (granular use; web must be started separately)"
@@ -50,6 +51,9 @@ teardown-agent:
 
 demo:
 	bash scripts/demo-all.sh
+
+present:
+	bash scripts/present.sh
 
 demo-web:
 	cd apps/web && pnpm dev
