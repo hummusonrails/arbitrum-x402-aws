@@ -749,8 +749,12 @@ def cmd_demo() -> int:
                           Text(""), _share_reminders()),
                     border="brand.amber", box_=box.DOUBLE),
          advance=False)
-    pause("screen shared and ready?  Enter to begin SEGMENT 3 (provider)")
+    pause("screen shared and ready?  Enter to begin the setup recap")
 
+    rc = cmd_setup()
+    if rc:
+        return rc
+    pause("Enter to begin SEGMENT 3 (provider)")
     rc = cmd_provider()
     if rc:
         return rc
