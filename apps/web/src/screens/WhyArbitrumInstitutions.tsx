@@ -1,15 +1,6 @@
-import { Slide, Eyebrow, Title, Panel, LogoWall } from "@/components/ui";
+import { Slide, Eyebrow, Title, Panel } from "@/components/ui";
 
 export function WhyArbitrumInstitutions() {
-  const rwas = [
-    "Franklin Templeton",
-    "BlackRock",
-    "WisdomTree",
-    "Invesco",
-    "Spiko",
-    "Robinhood",
-  ];
-  const stables = ["Tether", "Circle", "PayPal", "Paxos", "Bitso", "M0"];
   return (
     <Slide>
       <Eyebrow>Why Arbitrum · the ecosystem is already here</Eyebrow>
@@ -17,19 +8,15 @@ export function WhyArbitrumInstitutions() {
         High-quality assets and the{" "}
         <span className="text-blue">TradFi &times; DeFi convergence.</span>
       </Title>
-      <div className="mt-8 space-y-5">
-        <div>
-          <div className="text-blue font-semibold mb-2">
-            RWAs &middot; $893M tokenized, ~7&times; YTD
-          </div>
-          <LogoWall names={rwas} />
-        </div>
-        <div>
-          <div className="text-blue font-semibold mb-2">Stablecoins</div>
-          <LogoWall names={stables} />
-        </div>
+      <div className="mt-5 flex justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/onchain-assets.png"
+          alt="RWA and stablecoin issuers on Arbitrum: Franklin Templeton, BlackRock, WisdomTree, Invesco, Spiko, Robinhood, Tether, PayPal, Bitso, Circle, Paxos, M0"
+          className="rounded-xl max-h-[42vh] w-auto"
+        />
       </div>
-      <div className="grid grid-cols-2 gap-6 mt-8">
+      <div className="grid grid-cols-2 gap-6 mt-6">
         <Panel>
           <div className="text-white font-semibold mb-1">TradFi → on-chain</div>
           <div className="text-lightblue/80 text-sm leading-snug">
@@ -47,9 +34,10 @@ export function WhyArbitrumInstitutions() {
           </div>
         </Panel>
       </div>
-      <div className="text-lightblue/70 text-sm mt-6">
-        Arbitrum hosts the deepest liquidity across both RWAs and DeFi &mdash;
-        the natural convergence point, and the place to settle agent payments.
+      <div className="text-lightblue/70 text-sm mt-5">
+        $893M tokenized RWAs (~7&times; YTD) and the deepest liquidity across both
+        RWAs and DeFi &mdash; the natural convergence point, and the place to
+        settle agent payments.
       </div>
     </Slide>
   );
