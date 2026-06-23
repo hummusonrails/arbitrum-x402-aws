@@ -28,6 +28,12 @@ apps/agent/.ruff_cache/
 apps/merchant/dist/
 apps/merchant/cdk.out/
 packages/*/dist/
+apps/web/.next/
+apps/web/next-env.d.ts
+apps/web/*.tsbuildinfo
+
+# Web companion <-> CLI sync state
+.demo-sync.json
 
 # Local plan/spec scratchpad (never committed)
 docs/superpowers/

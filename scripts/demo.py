@@ -44,6 +44,32 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = REPO_ROOT / ".env"
 load_dotenv(ENV_PATH, override=True)
 
+# Web companion sync: the CLI writes the current step here; apps/web polls it.
+SYNC_FILE = REPO_ROOT / ".demo-sync.json"
+STEPS_FILE = REPO_ROOT / "apps" / "web" / "steps.json"
+_sync_seq = 0
+
+
+def sync(step_id: str) -> None:
+    """Best-effort: tell the web companion which screen to show. Never raises."""
+    global _sync_seq
+    _sync_seq += 1
+    try:
+        SYNC_FILE.write_text(
+            __import__("json").dumps({"step": step_id, "ts": _sync_seq})
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _load_steps() -> list[dict]:
+    try:
+        import json as _json
+
+        return _json.loads(STEPS_FILE.read_text())
+    except Exception:  # noqa: BLE001
+        return []
+
 from bedrock_agentcore.payments import PaymentManager  # noqa: E402
 
 from x402_aws_agent.config import load_run_config  # noqa: E402
@@ -735,6 +761,28 @@ def cmd_preflight() -> int:
     return 0
 
 
+def cmd_context() -> int:
+    """The ~15-min context portion. The web companion shows the rich visuals;
+    the terminal shows a one-line cue and drives the sync."""
+    context = [
+        s for s in _load_steps()
+        if s["id"] not in ("live-provider", "live-agent", "takeaways")
+    ]
+    for s in context:
+        sync(s["id"])
+        show(deck_panel(
+            Group(
+                Text("COMPANION", style="brand.blue", justify="center"),
+                Text(""),
+                Text(s["title"], style="bold white", justify="center"),
+                Text(""),
+                para("Showing on the companion screen in your browser. Narrate it, "
+                     "then press Enter for the next one.", justify="center"),
+            ),
+            title="[brand.blue]Context[/]", border="brand.blue"))
+    return 0
+
+
 def cmd_demo() -> int:
     title_slide("Agentic payments, settled on Arbitrum One",
                 "live demo · press Enter to advance", [BLUE, PURPLE], "brand.blue")
@@ -761,24 +809,30 @@ def cmd_demo() -> int:
                           Text(""), _share_reminders()),
                     border="brand.amber", box_=box.DOUBLE),
          advance=False)
-    pause("screen shared and ready?  Enter to begin the setup recap")
+    pause("companion open in your browser?  Enter to begin the context")
 
-    rc = cmd_setup()
+    # Context (~15 min) — driven on the web companion
+    rc = cmd_context()
     if rc:
         return rc
-    pause("Enter to begin SEGMENT 3 (provider)")
+
+    # Live (~15 min) — the terminal does the real work; the web mirrors it
+    pause("Enter to begin the LIVE demo — SEGMENT 3 (provider)")
+    sync("live-provider")
     rc = cmd_provider()
     if rc:
         return rc
     pause("Enter to begin SEGMENT 4: the agent pays, live")
+    sync("live-agent")
     rc = cmd_agent()
     if rc:
         return rc
 
+    sync("takeaways")
     show(deck_panel(
         para("That was the whole loop: a 402 invoice, an autonomous payment, and "
-             "real settlement on Arbitrum One. Back to you for the wrap-up.",
-             justify="center"),
+             "real settlement on Arbitrum One. Takeaways are on the companion. "
+             "Back to you for the wrap-up.", justify="center"),
         title="[brand.blue]Demo complete[/]", border="brand.blue"), advance=False)
     return 0
 

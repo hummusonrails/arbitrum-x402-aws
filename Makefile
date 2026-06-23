@@ -1,4 +1,4 @@
-.PHONY: help install test build synth deploy-merchant destroy-merchant setup-agent run-agent teardown-agent clean demo demo-preflight demo-provider demo-agent
+.PHONY: help install test build synth deploy-merchant destroy-merchant setup-agent run-agent teardown-agent clean demo demo-web demo-preflight demo-provider demo-agent
 
 help:
 	@echo "Targets:"
@@ -12,6 +12,7 @@ help:
 	@echo "  run-agent         Run the agent against the merchant"
 	@echo "  teardown-agent    Delete AgentCore resources"
 	@echo "  clean             Remove node_modules, .venv, build artifacts"
+	@echo "  demo-web          Start the web companion (run this first, in its own terminal)"
 	@echo "  demo              LIVE DEMO entry point: pre-flight then segments 3 + 4"
 	@echo "  demo-preflight    (escape hatch) prep only: refresh session + smoke-test"
 	@echo "  demo-provider     (escape hatch) segment 3 only: the 402 / payment terms"
@@ -48,6 +49,9 @@ teardown-agent:
 
 demo:
 	cd apps/agent && uv run python ../../scripts/demo.py demo
+
+demo-web:
+	cd apps/web && pnpm dev
 
 demo-preflight:
 	cd apps/agent && uv run python ../../scripts/demo.py preflight

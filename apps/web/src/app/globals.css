@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #213147;
+  --color-navy-alt: #2d364d;
+  --color-blue: #12aaff;
+  --color-lightblue: #9dcced;
+  --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #213147;
+  color: #ffffff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle geometric hex/grid texture for the dark background */
+.hex-bg {
+  background-color: #213147;
+  background-image:
+    radial-gradient(circle at 18% 18%, rgba(18, 170, 255, 0.10), transparent 42%),
+    radial-gradient(circle at 85% 80%, rgba(157, 204, 237, 0.08), transparent 45%),
+    linear-gradient(rgba(157, 204, 237, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(157, 204, 237, 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+}
+
+@keyframes fadeup {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeup {
+  animation: fadeup 0.5s ease-out both;
+}
