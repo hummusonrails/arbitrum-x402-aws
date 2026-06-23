@@ -3,6 +3,8 @@
   { "id": "gap", "title": "Traditional payments assume a human at checkout", "kind": "context" },
   { "id": "what-x402", "title": "x402: internet-native payments", "kind": "context" },
   { "id": "adoption-logos", "title": "Institutional adoption", "kind": "context" },
+  { "id": "aws", "title": "AWS made agent payments a managed service", "kind": "context" },
+  { "id": "aws-architecture", "title": "The full loop, on AWS", "kind": "context" },
   { "id": "adoption-stats", "title": "x402 adoption today", "kind": "context" },
   { "id": "ecosystem", "title": "The agent-payment standards landscape", "kind": "context" },
   { "id": "why-arbitrum", "title": "Why Arbitrum: settlement economics", "kind": "context" },

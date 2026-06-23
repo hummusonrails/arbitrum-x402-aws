@@ -4,6 +4,8 @@ import { Hook } from "./Hook";
 import { Gap } from "./Gap";
 import { WhatX402 } from "./WhatX402";
 import { AdoptionLogos } from "./AdoptionLogos";
+import { Aws } from "./Aws";
+import { AwsArchitecture } from "./AwsArchitecture";
 import { AdoptionStats } from "./AdoptionStats";
 import { Ecosystem } from "./Ecosystem";
 import { WhyArbitrum } from "./WhyArbitrum";
@@ -17,6 +19,8 @@ export const SCREENS: Record<string, ComponentType> = {
   gap: Gap,
   "what-x402": WhatX402,
   "adoption-logos": AdoptionLogos,
+  aws: Aws,
+  "aws-architecture": AwsArchitecture,
   "adoption-stats": AdoptionStats,
   ecosystem: Ecosystem,
   "why-arbitrum": WhyArbitrum,

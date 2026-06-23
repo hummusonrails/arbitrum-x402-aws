@@ -13,21 +13,23 @@ export function AdoptionStats() {
     <Slide>
       <Eyebrow>x402 adoption today</Eyebrow>
       <Title>
-        Real volume &mdash; and{" "}
-        <span className="text-blue">wide open on Arbitrum.</span>
+        Built by Coinbase. <span className="text-blue">Open to every L2.</span>
       </Title>
       <div className="grid grid-cols-3 gap-8 mt-8 items-center">
         <div className="col-span-2">
           <Bars data={byChain} />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-5">
           <Stat value="98.8%" label="of EVM dollar volume is USDC on Base" />
-          <Panel className="text-center">
-            <div className="text-white text-lg">
-              Arbitrum: <span className="text-blue font-bold">522</span> txns
+          <Panel>
+            <div className="text-white leading-snug">
+              Coinbase created x402 and Base has the early volume &mdash; a real
+              first-mover lead. But the spec is <span className="text-blue">open</span>:
+              any EVM L2 settles it the same way.
             </div>
-            <div className="text-lightblue/70 text-sm mt-1">
-              The greenfield is the point.
+            <div className="text-lightblue/70 text-sm mt-3 leading-snug">
+              Arbitrum&rsquo;s 522 isn&rsquo;t a gap, it&rsquo;s the opening.{" "}
+              <span className="text-blue">Why Arbitrum specifically? Later in this talk.</span>
             </div>
           </Panel>
         </div>
