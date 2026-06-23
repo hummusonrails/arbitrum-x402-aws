@@ -100,6 +100,7 @@ def pause(msg: str = "press Enter to continue  ▸") -> None:
 def show(renderable, *, top: int = 1, advance: bool = True) -> None:
     """Clear the screen and present one centered renderable as a slide."""
     console.clear()
+    _kitty_clear()
     console.print("\n" * top, end="")
     console.print(Align.center(renderable))
     if advance:
@@ -257,6 +258,18 @@ def _kitty_capable() -> bool:
         or "ghostty" in term
         or os.environ.get("TERM_PROGRAM", "") == "WezTerm"
     )
+
+
+def _kitty_clear() -> None:
+    """Delete all kitty graphics placements.
+
+    Clearing the text grid (console.clear / CSI 2J) does NOT remove kitty
+    images; they persist and ghost onto the next slide. This issues the
+    protocol's delete-all so every slide starts with no leftover image.
+    """
+    if sys.stdout.isatty() and _kitty_capable():
+        sys.stdout.write("\x1b_Ga=d,d=A\x1b\\")
+        sys.stdout.flush()
 
 
 def _kitty_draw(path: Path, rows: int) -> None:
@@ -696,6 +709,7 @@ def cmd_setup() -> int:
     ]
     for img, t, callout in steps:
         console.clear()
+        _kitty_clear()
         console.rule(f"[brand.amber]{t}[/]", style="brand.amber")
         console.print()
         console.print(Text(callout, style="muted", justify="center"))
