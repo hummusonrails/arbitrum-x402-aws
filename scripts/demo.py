@@ -252,7 +252,7 @@ def code_slide(rel_path: str, lexer: str, a: int, b: int, *, title: str,
     show(deck_panel(group, title=title, border=border, pad=(1, 3)))
 
 
-def _render_inline(path: Path, width: int) -> bool:
+def _render_inline(path: Path) -> bool:
     """Render a PNG inline using the terminal's graphics protocol. True on success.
 
     Ghostty / kitty use the Kitty graphics protocol; iTerm2 / WezTerm use the
@@ -266,7 +266,14 @@ def _render_inline(path: Path, width: int) -> bool:
     try:
         # from_file auto-selects the best style the active terminal supports
         # (Kitty on Ghostty/kitty, iTerm2 on iTerm2/WezTerm, blocks otherwise).
-        img = from_file(str(path), width=width)
+        img = from_file(str(path))
+        # Size by height so the image fits the viewport with room for the
+        # caption below; cap the width if the result would overflow.
+        max_h = max(10, min(console.size.height - 16, 22))
+        max_w = max(20, console.size.width - 6)
+        img.set_size(height=max_h)
+        if img.rendered_width > max_w:
+            img.set_size(width=max_w)
         img.draw(h_align="center", pad_width=console.size.width, check_size=False)
         return True
     except Exception:  # noqa: BLE001
@@ -280,7 +287,7 @@ def show_screenshot(name: str, width: int) -> None:
     path = SCREENSHOTS / name
     if not path.exists():
         return
-    if sys.stdout.isatty() and _render_inline(path, width):
+    if sys.stdout.isatty() and _render_inline(path):
         return
     if shutil.which("chafa"):
         subprocess.run(["chafa", f"--size={width}x", str(path)], check=False)
