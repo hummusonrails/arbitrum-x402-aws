@@ -681,14 +681,16 @@ def cmd_setup() -> int:
     title_slide("Before the agent can pay",
                 "the one-time setup, on CDP and AWS", [AMBER, BLUE], "brand.amber")
 
+    # Cropped to the region of interest (see images/demo/) so the small UI text
+    # is legible inline; a full-page screenshot scaled to the viewport is not.
     steps = [
-        ("01-cdp-create-api-key.png", "Coinbase Developer Platform: API key",
+        ("demo/01-cdp-create-api-key.png", "Coinbase Developer Platform: API key",
          "Create a Secret API key in CDP. The merchant authenticates to the CDP "
          "facilitator with it."),
-        ("01-cdp-delegated-signing.png", "CDP: delegated signing",
+        ("demo/01-cdp-delegated-signing.png", "CDP: delegated signing",
          "Enable delegated signing so AgentCore can sign for the agent, within a "
          "budget you set."),
-        ("03-iam-role-summary.png", "AWS: one IAM role",
+        ("demo/03-iam-role-summary.png", "AWS: one IAM role",
          "Create one IAM role that AgentCore Payments assumes at runtime to "
          "manage the wallet."),
     ]
