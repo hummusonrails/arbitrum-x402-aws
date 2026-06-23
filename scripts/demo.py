@@ -280,16 +280,42 @@ def _kitty_draw(path: Path, rows: int) -> None:
     out.flush()
 
 
-def show_screenshot(name: str) -> None:
-    """Show a docs screenshot inline (sized to fit), then chafa, then Preview."""
+def _png_size(path: Path) -> tuple[int, int]:
+    """Read a PNG's pixel (width, height) from its IHDR header. No dependency."""
+    b = path.read_bytes()[:24]
+    return int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big")
+
+
+# Approximate terminal cell height:width ratio (cells are ~twice as tall as wide).
+_CELL_RATIO = 2.1
+
+
+def show_screenshot(name: str, reserve_rows: int = 9) -> None:
+    """Show a docs screenshot inline, as large as the viewport allows.
+
+    Sized to fill the screen (leaving `reserve_rows` for the title, caption and
+    prompt) so the screenshot is upscaled rather than shrunk and stays legible.
+    Falls back to chafa, then Preview, on terminals without kitty graphics.
+    """
     if _AUTO:
         return
     path = SCREENSHOTS / name
     if not path.exists():
         return
-    rows = max(8, min(console.size.height - 14, 20))
+
+    w_px, h_px = _png_size(path)
+    avail_rows = max(10, console.size.height - reserve_rows)
+    avail_cols = max(20, console.size.width - 4)
+    aspect = (w_px / h_px) * _CELL_RATIO  # cols-per-row for this image
+    rows = avail_rows
+    if rows * aspect > avail_cols:        # would overflow width -> bind on width
+        rows = max(10, int(avail_cols / aspect))
+    pad = max(0, (avail_cols - int(rows * aspect)) // 2)
+
     if sys.stdout.isatty() and _kitty_capable():
         try:
+            if pad:
+                sys.stdout.write(f"\x1b[{pad}C")
             _kitty_draw(path, rows)
             sys.stdout.write("\n")
             sys.stdout.flush()
@@ -298,8 +324,7 @@ def show_screenshot(name: str) -> None:
             pass
     if shutil.which("chafa"):
         subprocess.run(
-            ["chafa", f"--size={console.size.width - 6}x{rows}", str(path)],
-            check=False,
+            ["chafa", f"--size={avail_cols}x{rows}", str(path)], check=False
         )
         return
     if sys.platform == "darwin":
@@ -658,27 +683,22 @@ def cmd_setup() -> int:
 
     steps = [
         ("01-cdp-create-api-key.png", "Coinbase Developer Platform: API key",
-         "On CDP you create a Secret API key. The merchant uses it to "
-         "authenticate to the CDP facilitator when it verifies and settles "
-         "payments. It is a one-time setup, done in the CDP portal."),
+         "Create a Secret API key in CDP. The merchant authenticates to the CDP "
+         "facilitator with it."),
         ("01-cdp-delegated-signing.png", "CDP: delegated signing",
-         "You enable delegated signing on the embedded wallet. This is what "
-         "lets AgentCore sign payments on the agent's behalf, within a budget "
-         "you set, without exposing a private key."),
+         "Enable delegated signing so AgentCore can sign for the agent, within a "
+         "budget you set."),
         ("03-iam-role-summary.png", "AWS: one IAM role",
-         "On AWS you create a single IAM role that AgentCore Payments assumes "
-         "at runtime to fetch the credentials and manage the wallet. The full "
-         "trust policy is in the getting-started guide."),
+         "Create one IAM role that AgentCore Payments assumes at runtime to "
+         "manage the wallet."),
     ]
     for img, t, callout in steps:
         console.clear()
-        console.print()
         console.rule(f"[brand.amber]{t}[/]", style="brand.amber")
         console.print()
-        show_screenshot(img)
+        console.print(Text(callout, style="muted", justify="center"))
         console.print()
-        console.print(Align.center(deck_panel(
-            para(callout, justify="center"), border="brand.amber", pad=(1, 2))))
+        show_screenshot(img)
         pause()
 
     show(deck_panel(
